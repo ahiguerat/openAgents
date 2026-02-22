@@ -83,6 +83,28 @@ Tareas:
 - Tipado correcto de mensajes (`MessageParam[]`)
 - Manejo básico de errores (rate limit, timeout)
 
+> **Nota — SDK y abstracción**
+>
+> El SDK de Anthropic (`@anthropic-ai/sdk`) apuntado a OpenRouter funciona correctamente para modelos de Anthropic (`anthropic/claude-*`). Para modelos de otros proveedores (Llama, GPT-4o, Gemini…) se necesitaría el SDK de OpenAI, ya que OpenRouter no traduce entre formatos.
+>
+> Para el MVP esto es suficiente. Sin embargo, el módulo debe exponer su **propia interfaz** (`LLMClient`, `LLMResponse`) de forma que el resto del sistema nunca importe el SDK directamente. Si en fases posteriores se quiere flexibilidad de modelos, el cambio queda acotado a este módulo:
+>
+> ```typescript
+> interface LLMClient {
+>   chat(params: {
+>     system: string
+>     messages: ChatMessage[]
+>     tools: ToolSpec[]
+>   }): Promise<LLMResponse>
+> }
+>
+> interface LLMResponse {
+>   stopReason: "tool_use" | "end_turn"
+>   text: string | null
+>   toolCalls: ToolCall[]
+> }
+> ```
+
 **DoD**: test manual que envía un mensaje y recibe respuesta de texto.
 
 ---

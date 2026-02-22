@@ -418,6 +418,7 @@ graph LR
 - Comunicación interna: eventos tipados en `Message Bus`.
 - **Orchestrator**: impulsado por LLM (Claude Sonnet vía OpenRouter). Absorbe el rol de `supervisor`; no existe como agente separado.
 - **Agent loop**: resuelto por el tool use nativo del LLM. El `Agent Runtime` gestiona la infraestructura (contexto, tools, memoria), no el loop en sí.
+- **LLM Client**: el SDK de Anthropic apuntado a OpenRouter funciona correctamente para modelos `anthropic/*`. Si en fases posteriores se requiere flexibilidad de proveedor (Llama, GPT-4o…), bastará con cambiar el adaptador interno de `platform/llm-client/`, siempre que el resto del sistema use únicamente la interfaz propia del módulo (`LLMClient`, `LLMResponse`) y nunca el SDK directamente.
 - **Human-in-the-loop**: el Orchestrator puede pausar tareas (`blocked`) para pedir confirmación o aclaración al usuario antes de continuar.
 - Skills: versionadas y validadas antes de habilitarse.
 - Tools: contratos estrictos y pruebas de integración.
