@@ -10,7 +10,7 @@ openAgents is a modular sandbox platform for building specialized agents with to
 
 The system follows a capability-based security model with centralized coordination:
 
-- **Orchestrator**: Receives user tasks, selects agents, manages task lifecycle (pending/running/blocked/completed/failed), applies policies (timeout, retry, budget)
+- **Orchestrator**: LLM-powered coordinator (Claude Sonnet via OpenRouter). Absorbs the supervisor role — reasons about task decomposition, selects agents, manages task lifecycle (pending/running/blocked/completed/failed), applies policies (timeout, retry, budget), and implements human-in-the-loop by pausing tasks (`blocked`) when user input is needed
 - **Agent Runtime**: Execution environment for agents, manages prompt context, tool selection, and standardizes agent I/O
 - **Tool Gateway**: Registers and executes tools with schema validation, permission control, and audit logging
 - **Message Bus**: Handles inter-agent communication via request/reply and pub/sub patterns
@@ -34,10 +34,10 @@ platform/
 └── observability/    # Logging, metrics, and traces
 
 agents/
-├── supervisor/       # High-level task coordination agent
 ├── planner/         # Planning and strategy agent
 ├── coder/           # Code implementation agent
 └── reviewer/        # Code review agent
+# Note: supervisor role is absorbed into platform/orchestrator/
 
 skills/              # Installable behavior modules
 schemas/             # JSON Schema contracts (see below)
@@ -99,12 +99,14 @@ All inter-component communication follows strict JSON Schema contracts in `schem
 
 ## Task Flow
 
-1. User submits task to Orchestrator via API Gateway
-2. Orchestrator creates `task_id` and selects initial agent (typically supervisor or planner)
-3. Agent executes steps, calling tools via Tool Gateway
-4. Inter-agent collaboration happens through Message Bus events
-5. Orchestrator collects partial results
-6. Final `AgentResult` is consolidated and returned to user
+1. User submits task (or an Activity generates one via a Trigger)
+2. API Gateway creates `task_id` and `trace_id`
+3. Orchestrator (LLM) reasons about task decomposition and selects agents
+4. If clarification is needed, Orchestrator pauses (`blocked`) and requests user input
+5. Agent Runtime executes the chosen agent; the LLM loop (think → tool call → observe) is handled natively
+6. Inter-agent collaboration happens through Message Bus events
+7. Orchestrator consolidates partial results; may replan if needed
+8. Final `AgentResult` is returned; memory promotion policy runs
 
 ## MVP Scope (Current Target)
 
@@ -115,7 +117,7 @@ The first deliverable includes:
    - `get_task_status(task_id)` → status object
    - `get_task_result(task_id)` → `AgentResult`
 
-2. **Complete flow** with 2 agents: supervisor + planner
+2. **Complete flow**: Orchestrator (LLM) + planner agent
 
 3. **Initial tools**: `filesystem.read` and `filesystem.write` with schema validation
 

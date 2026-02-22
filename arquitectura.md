@@ -11,7 +11,7 @@ Construir una base reutilizable para crear agentes especializados con `tools` y 
 Persona o sistema cliente que envía objetivos. Nunca interactúa directamente con subagentes; siempre entra a través del `Orchestrator`.
 
 **Agente (`Agent`)**
-Unidad de razonamiento autónoma con un rol definido (p.ej. `supervisor`, `planner`, `coder`, `reviewer`). Decide qué pasos dar y delega la ejecución en `Tools`.
+Unidad de razonamiento autónoma con un rol especializado (p.ej. `planner`, `coder`, `reviewer`). Decide qué pasos dar y delega la ejecución en `Tools`. El rol de coordinación y supervisión lo asume directamente el `Orchestrator`.
 
 **Tool**
 Capacidad ejecutable con efectos observables: leer un archivo, llamar una API, consultar una base de datos. Toda tool tiene un contrato formal (`ToolSpec`).
@@ -23,13 +23,15 @@ Paquete de conocimiento y comportamiento que especializa a un agente. Guía cóm
 Unidad de trabajo enviada al sistema. Tiene un objetivo concreto, un ciclo de vida (`pending → running → blocked → completed | failed`) y produce un resultado. Puede ser creada por un usuario o por una `Activity`.
 
 **Activity**
-Entidad persistente y proactiva que genera `Tasks` en respuesta a `Triggers` o eventos del sistema. Representa el comportamiento autónomo sin intervención directa del usuario.
+Entidad persistente y proactiva que genera `Tasks` en respuesta a `Triggers` o eventos del sistema. Representa el comportamiento autónomo sin intervención directa del usuario. Existen dos tipos:
+- `scheduled`: cada ejecución es independiente, sin estado entre ciclos (p.ej. un informe nocturno).
+- `continuous`: mantiene estado entre ejecuciones y evalúa en cada ciclo si hay que actuar o no. El patrón *heartbeat* es una `continuous Activity` con un `cron` de alta frecuencia.
 
 **Trigger**
 Lo que activa una `Activity`: temporal (`cron`), externo (`webhook`), condicional (umbral de métrica) o reactivo a un evento del sistema.
 
 **Orchestrator**
-Coordinador central. Recibe tareas, selecciona agentes, aplica políticas y consolida resultados. No ejecuta lógica de negocio directamente; delega en agentes y tools.
+Coordinador central impulsado por LLM. Absorbe el rol de supervisor: razona sobre cómo descomponer tareas, qué agentes invocar y en qué orden. Aplica políticas, consolida resultados y puede pausar la ejecución para pedir input al usuario (`human-in-the-loop`). El loop de razonamiento lo gestiona el propio modelo vía tool use nativo.
 
 **Memory**
 Conocimiento del sistema en dos capas: corto plazo (estado temporal por tarea, con TTL) y largo plazo (persistente entre tareas). Incluye recuperación por similitud (RAG) para enriquecer el contexto del agente antes de cada ejecución.
@@ -88,7 +90,7 @@ Hilo que une todos los `Events` de una `Task` de principio a fin, identificado p
 ### Componentes de plataforma
 
 **Agent Runtime**
-Proceso que ejecuta el loop de un agente. Gestiona contexto, selección de `tools`, memoria corta y formato de entrada/salida.
+Proceso que ejecuta a un agente especializado. Construye el contexto inicial, expone las `tools` disponibles y gestiona el ciclo de tool use nativo del LLM (el modelo decide cuándo llamar tools y cuándo terminar). Gestiona memoria corta y manejo de errores.
 
 **Tool Gateway**
 Capa única para registrar, validar y ejecutar `tools`. Centraliza seguridad y auditoría de todas las ejecuciones.
@@ -125,20 +127,28 @@ Técnica donde el agente recupera contexto relevante desde memoria antes de gene
 - No ejecuta lógica de negocio de agentes.
 
 ### Orchestrator
-- Crea y gobierna el ciclo de vida de tareas (`pending`, `running`, `blocked`, `completed`, `failed`).
-- Selecciona agentes y secuencia de colaboración.
-- Aplica políticas de control operativo.
-- Gestiona scopes de memoria por tarea (`task memory scope`).
-- Decide cuándo habilitar consulta RAG (por política, costo o criticidad).
-- No llama integraciones externas de forma directa; delega a agentes y tools.
+- Impulsado por LLM (p.ej. Claude Sonnet vía OpenRouter). Absorbe el rol de `supervisor`.
+- Razona sobre descomposición de tareas, selección de agentes y estrategia de ejecución.
+- Gobierna el ciclo de vida de tareas (`pending`, `running`, `blocked`, `completed`, `failed`).
+- Implementa `human-in-the-loop`: detecta ambigüedad, riesgo o necesidad de confirmación y pausa la tarea solicitando input al usuario.
+- Aplica políticas de control operativo (timeout, retry, budget).
+- Gestiona scopes de memoria por tarea y decide cuándo activar RAG.
+- No llama integraciones externas directamente; delega en agentes especializados y tools.
 
 ### Agent Runtime
-- Ejecuta el loop de cada agente.
-- Interpreta `skills` activas para orientar decisiones.
-- Invoca `tools` vía `Tool Gateway`.
+- Ejecuta a un agente especializado (`planner`, `coder`, `reviewer`).
+- Construye el contexto inicial (task, skills activas, memoria corta, contexto RAG).
+- Expone al modelo las `tools` disponibles y gestiona el ciclo de tool use nativo del LLM.
+- El loop de razonamiento (pensar → llamar tool → observar resultado → repetir) lo resuelve el modelo; el Runtime gestiona la infraestructura alrededor.
 - Lee/escribe memoria de corto plazo durante la ejecución.
-- Solicita contexto recuperado (RAG) al `Memory Service` cuando la tarea lo requiere.
 - No gestiona transporte de mensajería global (eso pertenece a `Message Bus`).
+
+### Activity
+- Representa comportamiento proactivo: define tipo (`scheduled | continuous`), trigger y agentes objetivo.
+- Suscribe a eventos del `Message Bus` relevantes para su condición de activación.
+- Al activarse, genera una `Task` y la envía al `Orchestrator`.
+- Gestiona su propio ciclo de vida: `active | paused | stopped`.
+- Las `continuous Activities` mantienen estado entre ciclos en memoria corta.
 
 ### Memory Service
 - Servicio especializado para lectura/escritura de memoria.
@@ -212,13 +222,13 @@ graph TB
 ## 5. Memoria por tipo de agente
 
 ### Agentes que deben tener memoria de corto plazo
-- `supervisor`: estado de coordinación de subtareas y decisiones de enrutamiento.
+- `orchestrator`: estado de coordinación de la tarea en curso, decisiones de enrutamiento y contexto de conversación con el usuario.
 - `planner`: plan actual, hipótesis de trabajo y pasos pendientes.
 - `coder`: contexto técnico inmediato (archivos tocados, errores recientes, decisiones de implementación).
 - `reviewer`: criterios de revisión aplicados y hallazgos de la sesión.
 
 ### Agentes que deben usar memoria de largo plazo y RAG
-- `supervisor`: políticas históricas, patrones de resolución y preferencias del usuario/equipo.
+- `orchestrator`: políticas históricas, patrones de resolución y preferencias del usuario/equipo.
 - `planner`: plantillas de planes exitosos por tipo de problema.
 - `coder`: convenciones de proyecto y decisiones arquitectónicas persistentes.
 - `reviewer`: baseline de calidad, reglas de aceptación y defectos recurrentes.
@@ -227,16 +237,18 @@ Regla práctica:
 - Todos los agentes usan corto plazo.
 - Largo plazo y RAG se habilitan por caso de uso y política de gobernanza; no todo debe persistirse.
 
-## 6. Flujo principal (con memoria y RAG)
-1. Usuario envía `submit_task` al `API Gateway`.
-2. Gateway genera/propaga `task_id` y `trace_id`.
-3. `Orchestrator` crea scope de memoria corta y decide si la tarea usa RAG.
-4. `Agent Runtime` consulta `Memory Service.retrieve(...)` con objetivo, rol y filtros.
-5. `Memory Service` retorna contexto comprimido/re-rankeado para el agente.
-6. El agente ejecuta pasos, invoca tools vía `Tool Gateway` y registra hitos en memoria corta.
-7. Si necesita colaboración, usa `Message Bus` para pedir apoyo a otro agente y comparte estado mínimo.
-8. Al finalizar, `Orchestrator` consolida `AgentResult` y dispara política de promoción a memoria larga.
-9. `Memory Service` resume, clasifica, indexa y persiste solo lo que cumpla reglas de retención.
+## 6. Flujo principal
+
+1. El usuario envía `submit_task` al `API Gateway` — o bien una `Activity` genera una `Task` al activarse su `Trigger`.
+2. Gateway crea y propaga `task_id` y `trace_id`.
+3. `Orchestrator` (LLM) crea scope de memoria corta, consulta RAG si aplica, y razona sobre qué agentes invocar y en qué orden.
+4. Si detecta ambigüedad o riesgo, pausa la tarea (`blocked`) y solicita input al usuario (`human-in-the-loop`). La tarea se reanuda con `resume_task`.
+5. El `Agent Runtime` ejecuta el agente elegido: construye contexto, expone tools y gestiona el ciclo de tool use nativo del LLM.
+6. El agente invoca tools vía `Tool Gateway` y registra hitos en memoria corta.
+7. Si necesita colaboración, usa el `Message Bus` para coordinarse con otro agente.
+8. El `Orchestrator` consolida el resultado; si no es satisfactorio, puede replanificar y reintentar.
+9. Al finalizar, dispara la política de promoción a memoria larga.
+10. `Memory Service` resume, clasifica, indexa y persiste solo lo que cumpla reglas de retención.
 
 ### Diagrama de flujo principal
 
@@ -244,7 +256,7 @@ Regla práctica:
 sequenceDiagram
     actor U as Usuario
     participant GW as API Gateway
-    participant ORC as Orchestrator
+    participant ORC as Orchestrator LLM
     participant RT as Agent Runtime
     participant MS as Memory Service
     participant TG as Tool Gateway
@@ -253,12 +265,22 @@ sequenceDiagram
     U->>GW: submit_task(goal, context)
     GW->>GW: genera task_id + trace_id
     GW->>ORC: AgentTask
-    ORC->>MS: crea scope de memoria corta
-    ORC->>RT: ejecuta agente
-    RT->>MS: retrieve(query, role, filters)
-    MS-->>RT: RetrievalResult con contexto comprimido
 
-    loop Pasos del agente
+    ORC->>MS: crea scope de memoria corta
+    ORC->>MS: retrieve(contexto relevante)
+    MS-->>ORC: contexto comprimido
+    ORC->>ORC: razona: qué agentes, en qué orden
+
+    alt human-in-the-loop
+        ORC-->>GW: AgentResult { status: blocked }
+        GW-->>U: solicita input
+        U->>GW: resume_task(input)
+        GW->>ORC: continúa con input
+    end
+
+    ORC->>RT: ejecuta agente(task + contexto)
+
+    loop Tool use nativo del LLM
         RT->>TG: invoke(tool_name, input)
         TG-->>RT: ToolResult
         RT->>MS: append(hito)
@@ -280,14 +302,15 @@ sequenceDiagram
 
 ### AgentTask
 - `id`: identificador único de tarea.
+- `project_id`: proyecto al que pertenece (opcional; permite herencia de constraints, skills y memoria).
 - `goal`: objetivo principal.
-- `context`: contexto de entrada para ejecución.
-- `constraints`: límites de costo, tiempo, alcance, etc.
-- `reply_to`: canal destino para respuesta final.
+- `context`: información adicional relevante para la ejecución.
+- `constraints`: límites de costo, tiempo y alcance.
+- `reply_to`: destino de la respuesta final — callback URL (webhooks) o nombre de canal (Message Bus interno).
 
 ### AgentResult
 - `task_id`: tarea asociada.
-- `status`: `completed | failed | blocked`.
+- `status`: `completed | failed | blocked`. El estado `blocked` indica que el Orchestrator necesita input del usuario para continuar; la tarea se reanuda mediante `resume_task(task_id, input)`.
 - `summary`: síntesis del resultado.
 - `artifacts`: salidas generadas (archivos, datos, links).
 - `next_actions`: sugerencias de siguientes pasos.
@@ -330,34 +353,19 @@ sequenceDiagram
 - `strategy`: `semantic | hybrid | keyword`.
 - `latency_ms`: tiempo de recuperación.
 
-## 8. Implementación recomendada (memoria + RAG)
+## 8. Fases de implementación de memoria
 
 ### Fase 1: Memoria corta operativa
-- Store recomendado: Redis (TTL nativo).
-- Clave sugerida: `mem:short:{task_id}:{agent_id}`.
-- Operaciones mínimas: `append`, `read_recent`, `clear`.
-- Política: purga automática al cerrar tarea o TTL.
+Store key-value por `task_id` con TTL. Operaciones mínimas: `append`, `read_recent`, `clear`. Purga automática al cerrar tarea.
 
 ### Fase 2: Memoria larga controlada
-- Store recomendado: Postgres para metadatos + almacenamiento documental.
-- Pipeline de promoción:
-  1. Extraer candidatos desde memoria corta al final de tarea.
-  2. Resumir y normalizar contenido.
-  3. Clasificar sensibilidad.
-  4. Persistir solo contenido permitido.
-- Operaciones mínimas: `upsert_fact`, `search`, `forget`.
+Store persistente con metadatos y documentos normalizados. Pipeline de promoción al final de cada tarea: extraer candidatos → resumir → clasificar sensibilidad → persistir solo lo permitido. Operaciones mínimas: `upsert_fact`, `search`, `forget`.
 
 ### Fase 3: Capa RAG
-- Generar embeddings durante ingesta/promoción.
-- Indexar en vector store (pgvector/Qdrant/Weaviate).
-- Recuperar top-k + filtros de gobernanza.
-- Aplicar re-ranking y compresión antes de inyectar al Runtime.
-- Medir `recall@k`, hit-rate y efectividad en respuesta final.
+Embeddings generados durante ingesta. Índice vectorial con recuperación top-k filtrada por permisos. Re-ranking y compresión antes de inyectar contexto al agente.
 
 ### Fase 4: Gobernanza
-- Retención por tipo de dato.
-- Derecho al borrado (`forget`) por usuario/proyecto.
-- Auditoría de accesos a memoria larga y consultas RAG.
+Políticas de retención por tipo de dato, derecho al borrado por usuario/proyecto, y auditoría de accesos.
 
 ### Diagrama de memoria y RAG
 
@@ -408,6 +416,9 @@ graph LR
 ## 11. Decisiones iniciales recomendadas
 - Comunicación de usuario: siempre vía `Orchestrator` (a través de `API Gateway`).
 - Comunicación interna: eventos tipados en `Message Bus`.
+- **Orchestrator**: impulsado por LLM (Claude Sonnet vía OpenRouter). Absorbe el rol de `supervisor`; no existe como agente separado.
+- **Agent loop**: resuelto por el tool use nativo del LLM. El `Agent Runtime` gestiona la infraestructura (contexto, tools, memoria), no el loop en sí.
+- **Human-in-the-loop**: el Orchestrator puede pausar tareas (`blocked`) para pedir confirmación o aclaración al usuario antes de continuar.
 - Skills: versionadas y validadas antes de habilitarse.
 - Tools: contratos estrictos y pruebas de integración.
 - MCP: integrado como adaptador de `Tool Gateway`.
