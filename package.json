@@ -11,8 +11,8 @@
     "cli"
   ],
   "scripts": {
-    "dev": "bun run --cwd platform/orchestrator dev",
-    "cli": "bun run --cwd cli dev",
+    "dev": "bun platform/orchestrator/src/index.ts",
+    "cli": "bun cli/src/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

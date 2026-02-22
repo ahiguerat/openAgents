@@ -4,7 +4,7 @@
   "private": true,
   "main": "src/index.ts",
   "scripts": {
-    "dev": "bun run src/index.ts"
+    "dev": "bun src/index.ts"
   },
   "dependencies": {
     "@openagents/observability": "workspace:*"
