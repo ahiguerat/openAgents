@@ -1,0 +1,21 @@
+{
+  "name": "openagents",
+  "version": "0.0.1",
+  "private": true,
+  "workspaces": [
+    "platform/llm-client",
+    "platform/tool-gateway",
+    "platform/runtime",
+    "platform/orchestrator",
+    "platform/observability",
+    "cli"
+  ],
+  "scripts": {
+    "dev": "bun run --cwd platform/orchestrator dev",
+    "cli": "bun run --cwd cli dev",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}
