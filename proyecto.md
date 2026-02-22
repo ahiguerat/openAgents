@@ -1,89 +1,261 @@
-# Proyecto Base: Sandbox de Agentes con Tools y Skills
+# Proyecto: openAgents MVP
 
-## 1. Alcance
-Este proyecto define una base para:
-- Crear agentes especializados reutilizables.
-- Conectar agentes entre sí.
-- Exponer tools seguras y observables.
-- Incorporar skills como módulos de conocimiento/flujo.
+## 1. Objetivo
 
-## 2. Estructura de carpetas
-```text
-.
-├── arquitectura.md
-├── proyecto.md
-├── platform/
-│   ├── runtime/
-│   ├── orchestrator/
-│   ├── tool-gateway/
-│   ├── message-bus/
-│   └── observability/
-├── agents/
-│   ├── supervisor/
-│   ├── planner/
-│   ├── coder/
-│   └── reviewer/
-├── skills/
-├── schemas/
-└── docs/
+Construir un MVP funcional de la plataforma openAgents que valide el flujo completo:
+
+```
+Usuario (CLI) → Orchestrator (LLM) → Agent Runtime → Tool Gateway → resultado
 ```
 
-## 3. Responsabilidad por módulo
-- `platform/runtime`: lifecycle y ejecución de agentes.
-- `platform/orchestrator`: coordinación de tareas multiagente.
-- `platform/tool-gateway`: registro, validación y ejecución de tools.
-- `platform/message-bus`: transporte de eventos y mensajes internos.
-- `platform/observability`: logs, métricas y trazas.
-- `agents/*`: implementaciones concretas de roles.
-- `skills/`: skills instaladas/creadas para comportamientos especializados.
-- `schemas/`: contratos JSON Schema compartidos.
-- `docs/`: documentación técnica y operativa adicional.
+El MVP demuestra que la arquitectura funciona end-to-end: el Orchestrator razona,
+crea un agente especializado, ese agente ejecuta tools reales y el resultado vuelve
+al usuario de forma trazable.
 
-## 4. MVP (primera entrega)
-1. API mínima para usuario:
-   - `submit_task(goal, context, constraints)`
-   - `get_task_status(task_id)`
-   - `get_task_result(task_id)`
-2. Un flujo completo con 2 agentes (`supervisor` + `planner`).
-3. 2 tools iniciales (ej. `filesystem.read`, `filesystem.write`) con schemas.
-4. Logging con `trace_id` por task.
-5. Skill de ejemplo en `skills/` para validar el pipeline.
+---
 
-## 5. Roadmap por fases
+## 2. Stack técnico
 
-### Fase 0 - Bootstrap
-- Crear contratos en `schemas/`.
-- Implementar estructura base del Orchestrator.
-- Definir interfaz común de agentes y tools.
+| Elemento | Elección | Motivo |
+|---|---|---|
+| Lenguaje | TypeScript | Ya definido en el proyecto |
+| Runtime | Bun | Más rápido, TS nativo, sin config extra |
+| LLM | Anthropic SDK + OpenRouter | 1 API key, todos los modelos |
+| Modelo | `anthropic/claude-sonnet-4-5` | Equilibrio calidad/coste |
+| API | Hono | Ligero, TS nativo, funciona con Bun |
+| Validación | AJV | Para los JSON Schemas existentes |
+| Logging | Pino | Estructurado, rápido, `task_id` + `trace_id` |
+| Interfaz usuario | CLI (readline) | Rápida de implementar para MVP |
+| Framework agente | Ninguno | El loop es ~30 líneas, lo construimos nosotros |
+| Docker | No en MVP | Se añade en fase de hardening |
+| Monorepo | Bun workspaces | Sin herramienta extra |
 
-### Fase 1 - Ejecución básica
-- Runtime funcional de un agente.
-- Tool Gateway con validación I/O.
-- Flujo end-to-end de una tarea simple.
+---
 
-### Fase 2 - Intercomunicación
-- Integrar Message Bus.
-- Habilitar request/reply entre agentes.
-- Manejar timeouts y retries.
+## 3. Dentro / fuera del MVP
 
-### Fase 3 - Skills y gobernanza
-- Cargar skills desde `skills/`.
-- Validar manifest/versionado.
-- Añadir políticas de permisos por agente/tool.
+### ✅ Dentro
+- Orchestrator LLM que razona y crea un agente
+- Agent Runtime con loop de tool use nativo
+- Tool Gateway con `filesystem.read` y `filesystem.write`
+- API: `submit_task`, `get_task_status`, `get_task_result`, `resume_task`
+- Una skill de ejemplo cargada por el Agent Runtime
+- CLI para interactuar con el Orchestrator
+- Logging estructurado con `task_id` + `trace_id`
+- Estado de tareas en memoria (in-process)
 
-### Fase 4 - Hardening
-- Observabilidad completa (métricas y trazas).
-- Reintentos robustos + DLQ.
-- Pruebas de carga y regresión.
+### ❌ Fuera (post-MVP)
+- Message Bus real (inter-agente)
+- Memory Service (short/long-term)
+- RAG
+- Agentes adicionales (planner, coder, reviewer como entidades separadas)
+- Activity / Trigger / proactividad
+- Docker / despliegue
+- Persistencia de tareas (base de datos)
+- Autenticación
 
-## 6. Definición de listo (DoD) del MVP
-- Una tarea recorre Orchestrator -> Agent Runtime -> Tool Gateway -> respuesta final.
-- Logs trazables por `task_id` y `trace_id`.
-- Contratos validados contra JSON Schema.
-- Pruebas básicas de integración pasando en CI.
+---
 
-## 7. Próximos pasos inmediatos
-1. Crear archivos de schema iniciales en `schemas/`.
-2. Definir interfaz `IAgent` y `ITool` en `platform/runtime` y `platform/tool-gateway`.
-3. Implementar un command runner mínimo en `platform/orchestrator`.
-4. Añadir una skill de ejemplo en `skills/base/`.
+## 4. Bloques de desarrollo
+
+### Bloque 0 — Setup del proyecto
+**Objetivo**: proyecto TypeScript funcional con Bun listo para desarrollar.
+
+Tareas:
+- Inicializar `package.json` con Bun workspaces
+- Configurar `tsconfig.json` (strict, paths)
+- Instalar dependencias: `@anthropic-ai/sdk`, `hono`, `pino`, `ajv`
+- Configurar variables de entorno (`.env` con `OPENROUTER_API_KEY`)
+- Script de dev: `bun run dev`
+
+**DoD**: `bun run dev` arranca sin errores.
+
+---
+
+### Bloque 1 — LLM Client
+**Objetivo**: módulo reutilizable para llamar a Claude vía OpenRouter.
+
+Ubicación: `platform/llm-client/`
+
+Tareas:
+- Cliente Anthropic apuntando a `https://openrouter.ai/api/v1`
+- Función `createLLMClient(apiKey)` → cliente configurado
+- Tipado correcto de mensajes (`MessageParam[]`)
+- Manejo básico de errores (rate limit, timeout)
+
+**DoD**: test manual que envía un mensaje y recibe respuesta de texto.
+
+---
+
+### Bloque 2 — Tool Gateway completo
+**Objetivo**: Tool Gateway capaz de registrar y ejecutar tools reales con validación.
+
+Ubicación: `platform/tool-gateway/` (ya existe parcialmente)
+
+Tareas:
+- Completar validación I/O contra JSON Schema (con AJV)
+- Implementar `filesystem.read` como `IToolAdapter`
+- Implementar `filesystem.write` como `IToolAdapter`
+- Logging de cada invocación (`tool_name`, `input`, `output`, `task_id`)
+
+API resultante:
+```typescript
+toolGateway.register(adapter: IToolAdapter): void
+toolGateway.invoke(name: string, input: unknown, taskId: string): Promise<ToolResult>
+toolGateway.getToolSpecs(): ToolSpec[]   // para pasarlas al LLM
+```
+
+**DoD**: `filesystem.read` y `filesystem.write` funcionan y rechazan input inválido.
+
+---
+
+### Bloque 3 — Agent Runtime + Skill
+**Objetivo**: motor que ejecuta un agente LLM con tools y skills.
+
+Ubicación: `platform/runtime/`
+
+Tareas:
+- Loop de tool use (~30 líneas):
+  ```
+  while (stop_reason !== "end_turn"):
+    llamar LLM con mensajes + tools
+    si hay tool_calls → ejecutar via Tool Gateway → añadir resultados
+  ```
+- `SkillLoader`: lee `SKILL.md` del directorio de la skill y lo inyecta como system prompt adicional
+- Construcción del contexto inicial: task goal + system prompt + skill activa
+- Devuelve `AgentResult` al terminar
+
+Skill de ejemplo: `skills/general-assistant/`
+```
+skills/general-assistant/
+├── SKILL.md        ← instrucciones inyectadas en el system prompt
+└── skill.json      ← manifest (name, version, triggers)
+```
+
+**DoD**: Agent Runtime ejecuta una tarea con filesystem tools y devuelve un resultado coherente.
+
+---
+
+### Bloque 4 — Orchestrator + API
+**Objetivo**: Orchestrator LLM + endpoints REST para interactuar con el sistema.
+
+Ubicación: `platform/orchestrator/`
+
+Tareas:
+- Estado de tareas en memoria: `Map<task_id, Task>`
+- Ciclo de vida: `pending → running → completed | failed | blocked`
+- Lógica LLM del Orchestrator: razona sobre el goal y decide crear un agente
+- Delega en Agent Runtime con la skill y tools adecuadas
+- Human-in-the-loop: si el Orchestrator necesita input, marca `blocked`
+- Endpoints con Hono:
+
+```
+POST /tasks                     → { task_id }
+GET  /tasks/:id/status          → { status, created_at, updated_at }
+GET  /tasks/:id/result          → AgentResult
+POST /tasks/:id/resume          → { input } → continúa tarea blocked
+```
+
+- Logging de cada cambio de estado con `task_id` + `trace_id`
+
+**DoD**: `POST /tasks` con un goal devuelve `task_id`; el resultado es recuperable en `GET /tasks/:id/result`.
+
+---
+
+### Bloque 5 — CLI
+**Objetivo**: interfaz de línea de comandos para interactuar con el Orchestrator.
+
+Ubicación: `cli/`
+
+Tareas:
+- Comando interactivo: pide goal al usuario, muestra estado en tiempo real, imprime resultado
+- Polling a `GET /tasks/:id/status` hasta `completed | failed | blocked`
+- Si `blocked`: muestra la pregunta del Orchestrator, recoge input, llama `resume_task`
+- Formato legible en terminal (sin librerías extra, solo `console.log`)
+
+Uso:
+```bash
+bun run cli
+> ¿Qué quieres hacer? Lee el archivo README.md y resúmelo
+> [running] Orchestrator procesando...
+> [completed] El README describe un sistema de agentes...
+```
+
+**DoD**: flujo completo funciona desde el terminal sin tocar el API directamente.
+
+---
+
+### Bloque 6 — Integración E2E
+**Objetivo**: validar que todo el sistema funciona de principio a fin.
+
+Tareas:
+- Test de integración: CLI → Orchestrator → Agent Runtime → filesystem tools → resultado
+- Verificar que los logs incluyen `task_id` y `trace_id` en cada paso
+- Verificar que `filesystem.read` rechaza paths fuera del sandbox
+- Verificar que un goal ambiguo desencadena el flujo `blocked` → `resume`
+
+**DoD**: el test E2E pasa y los logs son legibles y trazables.
+
+---
+
+## 5. Estructura de carpetas objetivo (post-MVP)
+
+```
+.
+├── platform/
+│   ├── llm-client/         # Bloque 1 — cliente Anthropic/OpenRouter
+│   ├── runtime/            # Bloque 3 — Agent Runtime + SkillLoader
+│   ├── orchestrator/       # Bloque 4 — Orchestrator LLM + API Hono
+│   ├── tool-gateway/       # Bloque 2 — Tool Gateway (ya existe parcialmente)
+│   ├── message-bus/        # (vacío en MVP)
+│   └── observability/      # (logging básico en MVP)
+├── agents/
+│   ├── planner/            # (vacío en MVP)
+│   ├── coder/              # (vacío en MVP)
+│   └── reviewer/           # (vacío en MVP)
+├── skills/
+│   └── general-assistant/  # Bloque 3 — primera skill
+├── schemas/                # Ya completo
+├── cli/                    # Bloque 5 — interfaz CLI
+├── docs/
+├── .env                    # OPENROUTER_API_KEY
+├── package.json
+├── tsconfig.json
+└── bunfig.toml
+```
+
+---
+
+## 6. Definición de Done del MVP
+
+- [ ] Una tarea recorre CLI → Orchestrator → Agent Runtime → Tool Gateway → resultado visible
+- [ ] El Orchestrator crea un agente y le delega la ejecución (no ejecuta directamente)
+- [ ] `filesystem.read` y `filesystem.write` funcionan y validan I/O contra schema
+- [ ] Una skill se carga y su contenido aparece en el system prompt del agente
+- [ ] Todos los logs incluyen `task_id` y `trace_id`
+- [ ] El flujo `blocked` / `resume_task` funciona desde la CLI
+- [ ] Test E2E pasa de principio a fin
+
+---
+
+## 7. Roadmap post-MVP
+
+### Fase 2 — Agentes especializados
+- Implementar `planner`, `coder`, `reviewer` como agentes reales
+- Orchestrator selecciona agente según tipo de tarea
+- Inter-agente básico vía Message Bus in-process
+
+### Fase 3 — Memory y persistencia
+- Short-term memory por `task_id`
+- Persistencia de tareas (SQLite o Postgres)
+- Long-term memory básico
+
+### Fase 4 — Activities y proactividad
+- Trigger por cron y por evento del Message Bus
+- `scheduled` y `continuous` Activities
+
+### Fase 5 — Hardening
+- Docker + despliegue
+- Observabilidad completa (métricas, trazas)
+- RAG sobre memoria larga
+- Seguridad: sandbox de filesystem, ACLs por agente
