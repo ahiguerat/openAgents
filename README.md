@@ -1,50 +1,23 @@
 # openAgents
 
-Base modular para construir agentes sandbox con `tools` y `skills`, y permitir su intercomunicacion de forma segura y trazable.
+Base modular para construir agentes sandbox con `tools` y `skills`, y permitir su intercomunicación de forma segura y trazable.
 
-## Estructura
+## Instalación
 
-```text
-.
-├── arquitectura.md
-├── proyecto.md
-├── platform/
-│   ├── runtime/
-│   ├── orchestrator/
-│   ├── tool-gateway/
-│   ├── message-bus/
-│   └── observability/
-├── agents/
-│   ├── supervisor/
-│   ├── planner/
-│   ├── coder/
-│   └── reviewer/
-├── skills/
-├── schemas/
-└── docs/
-```
+> ⚠️ Pendiente de definir tras completar el Bloque 0 del MVP.
 
-## Flujo base
+## Documentación
 
-1. El usuario envia una tarea al Orchestrator.
-2. El Orchestrator selecciona agentes y coordina ejecucion.
-3. Los agentes consumen tools via Tool Gateway.
-4. La intercomunicacion interna ocurre por Message Bus.
-5. Se devuelve un resultado consolidado al usuario.
+| Documento | Descripción |
+|---|---|
+| [`arquitectura.md`](./arquitectura.md) | Arquitectura del sistema: componentes, contratos, flujos y decisiones de diseño |
+| [`proyecto.md`](./proyecto.md) | Plan de desarrollo del MVP: bloques, stack, scope y roadmap |
 
-## Contratos iniciales
+## Esquemas
 
-Los contratos JSON Schema viven en `schemas/`:
+Los contratos JSON Schema viven en [`schemas/`](./schemas/):
 
-- `agent-task.schema.json`
-- `agent-result.schema.json`
-- `tool-spec.schema.json`
-- `skill-manifest.schema.json`
-
-Estos schemas son el punto de partida para validar mensajes entre componentes.
-
-## Proximos pasos
-
-1. Implementar interfaces `IAgent` y `ITool`.
-2. Crear API minima en `platform/orchestrator` (`submit_task`, `get_task_status`, `get_task_result`).
-3. Agregar pruebas de validacion de schemas en CI.
+- `agent-task.schema.json` — input de una tarea
+- `agent-result.schema.json` — resultado de un agente
+- `tool-spec.schema.json` — especificación de una tool
+- `skill-manifest.schema.json` — manifiesto de una skill
