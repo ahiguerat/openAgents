@@ -118,6 +118,30 @@ Protocolo para integrar fuentes externas (tools/resources) de forma estándar. E
 - Métricas RAG: `recall@k`, hit-rate, latencia de recuperación, tokens recuperados usados.
 - Trazas de extremo a extremo (usuario -> orquestación -> memoria/RAG/tools -> resultado).
 
+### Diagrama de componentes
+
+```mermaid
+graph TB
+    U([Usuario / Sistema]) --> GW[API Gateway]
+    GW --> ORC[Orchestrator]
+    ORC --> RT[Agent Runtime]
+    ORC <--> MB[Message Bus]
+    RT <--> MB
+    RT --> TG[Tool Gateway]
+    RT <--> MS[Memory Service]
+    SR[Skill Registry] --> RT
+    TG --> LOCAL[Tools locales]
+    TG --> MCP[Adaptador MCP]
+    MS --> REDIS[(Short-term Store · Redis)]
+    MS --> PG[(Long-term Store · Postgres)]
+    MS --> VEC[(Vector Store)]
+    OBS{{Observability}} -.-> GW
+    OBS -.-> ORC
+    OBS -.-> RT
+    OBS -.-> TG
+    OBS -.-> MS
+```
+
 ## 5. Memoria por tipo de agente
 
 ### Agentes que deben tener memoria de corto plazo
@@ -146,6 +170,44 @@ Regla práctica:
 7. Si necesita colaboración, usa `Message Bus` para pedir apoyo a otro agente y comparte estado mínimo.
 8. Al finalizar, `Orchestrator` consolida `AgentResult` y dispara política de promoción a memoria larga.
 9. `Memory Service` resume, clasifica, indexa y persiste solo lo que cumpla reglas de retención.
+
+### Diagrama de flujo principal
+
+```mermaid
+sequenceDiagram
+    actor U as Usuario
+    participant GW as API Gateway
+    participant ORC as Orchestrator
+    participant RT as Agent Runtime
+    participant MS as Memory Service
+    participant TG as Tool Gateway
+    participant MB as Message Bus
+
+    U->>GW: submit_task(goal, context)
+    GW->>GW: genera task_id + trace_id
+    GW->>ORC: AgentTask
+    ORC->>MS: crea scope de memoria corta
+    ORC->>RT: ejecuta agente
+    RT->>MS: retrieve(query, role, filters)
+    MS-->>RT: RetrievalResult con contexto comprimido
+
+    loop Pasos del agente
+        RT->>TG: invoke(tool_name, input)
+        TG-->>RT: ToolResult
+        RT->>MS: append(hito)
+    end
+
+    opt Colaboración inter-agente
+        RT->>MB: request a otro agente
+        MB-->>RT: reply con resultado parcial
+    end
+
+    RT-->>ORC: AgentResult
+    ORC->>MS: promote a memoria larga
+    MS->>MS: resumir, clasificar, indexar
+    ORC-->>GW: AgentResult final
+    GW-->>U: resultado
+```
 
 ## 7. Contratos base (sugeridos)
 
@@ -229,6 +291,37 @@ Regla práctica:
 - Retención por tipo de dato.
 - Derecho al borrado (`forget`) por usuario/proyecto.
 - Auditoría de accesos a memoria larga y consultas RAG.
+
+### Diagrama de memoria y RAG
+
+```mermaid
+graph LR
+    RT[Agent Runtime] -->|append hito| STS
+    RT -->|retrieve| PP
+    ORC[Orchestrator] -->|promote al cerrar tarea| LTS
+
+    subgraph MS [Memory Service]
+        STS[(Short-term · Redis · TTL)]
+        LTS[(Long-term · Postgres)]
+
+        subgraph RAG [Pipeline RAG]
+            ING[Ingesta y Segmentación]
+            EMB[Embeddings]
+            IDX[(Vector Store)]
+            RET[Recuperación top-k]
+            PP[Re-ranking y Compresión]
+        end
+
+        STS -->|candidatos al cerrar tarea| LTS
+        LTS --> ING
+        ING --> EMB
+        EMB --> IDX
+        IDX --> RET
+        RET --> PP
+    end
+
+    PP -->|contexto comprimido| RT
+```
 
 ## 9. Seguridad y sandbox
 - Cada agente corre con perfil de capacidades mínimo necesario.
