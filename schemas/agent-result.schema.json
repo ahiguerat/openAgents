@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openagents.dev/schemas/agent-result.schema.json",
+  "title": "AgentResult",
+  "description": "Normalized result produced by an agent workflow.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "task_id",
+    "status",
+    "summary",
+    "artifacts",
+    "next_actions"
+  ],
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "description": "Identifier of the task this result belongs to.",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "description": "Final task execution status.",
+      "enum": [
+        "completed",
+        "failed",
+        "blocked"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "description": "Human-readable summary of the outcome.",
+      "minLength": 1
+    },
+    "artifacts": {
+      "type": "array",
+      "description": "Generated outputs, files, links or references.",
+      "items": {
+        "type": "object"
+      }
+    },
+    "next_actions": {
+      "type": "array",
+      "description": "Suggested follow-up actions.",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

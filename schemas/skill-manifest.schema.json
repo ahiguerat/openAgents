@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openagents.dev/schemas/skill-manifest.schema.json",
+  "title": "SkillManifest",
+  "description": "Metadata used by the skill registry to load and validate a skill.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "description",
+    "triggers",
+    "resources",
+    "version"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Skill unique name.",
+      "pattern": "^[a-z0-9-]+$"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of what the skill does.",
+      "minLength": 1
+    },
+    "triggers": {
+      "type": "array",
+      "description": "Keywords or intents that activate the skill.",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "resources": {
+      "type": "object",
+      "description": "Declared files and folders used by the skill.",
+      "properties": {
+        "scripts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "references": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "version": {
+      "type": "string",
+      "description": "Semantic version of the skill.",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$"
+    }
+  }
+}
