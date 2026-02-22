@@ -5,51 +5,108 @@ Construir una base reutilizable para crear agentes especializados con `tools` y 
 
 ## 2. Glosario (definiciones clave)
 
-### Usuario
-Persona o sistema cliente que envía objetivos de negocio. Nunca habla directo con subagentes en producción; siempre entra por el `API Gateway`.
+### Conceptos fundamentales
 
-### Agente (`Agent`)
-Unidad de razonamiento autónoma con un rol (por ejemplo `supervisor`, `planner`, `coder`, `reviewer`). Un agente decide pasos y pide ejecución externa a través de `tools`.
+**Usuario**
+Persona o sistema cliente que envía objetivos. Nunca interactúa directamente con subagentes; siempre entra a través del `Orchestrator`.
 
-### Runtime de Agente (`Agent Runtime`)
-Proceso que ejecuta al agente. Gestiona contexto, memoria corta, selección de `tools`, manejo de errores y formato de entrada/salida.
+**Agente (`Agent`)**
+Unidad de razonamiento autónoma con un rol definido (p.ej. `supervisor`, `planner`, `coder`, `reviewer`). Decide qué pasos dar y delega la ejecución en `Tools`.
 
-### Tool (`Tool`)
-Capacidad ejecutable con efectos observables. Ejemplos: leer archivo, llamar API, consultar base de datos. Toda tool tiene contrato formal (`ToolSpec`).
+**Tool**
+Capacidad ejecutable con efectos observables: leer un archivo, llamar una API, consultar una base de datos. Toda tool tiene un contrato formal (`ToolSpec`).
 
-### Tool Gateway
-Capa única para registrar, validar y ejecutar `tools`. Aísla seguridad y evita que agentes llamen integraciones externas de forma directa.
+**Skill**
+Paquete de conocimiento y comportamiento que especializa a un agente. Guía cómo razona y actúa; no ejecuta acciones directamente (eso es responsabilidad de las `Tools`).
 
-### Skill
-Paquete de conocimiento y flujo para especializar comportamiento del agente. Incluye `SKILL.md` y opcionalmente `scripts/`, `references/` y `assets`.
-Una `skill` guía cómo razona/actúa el agente; una `tool` ejecuta acciones concretas.
+**Task**
+Unidad de trabajo enviada al sistema. Tiene un objetivo concreto, un ciclo de vida (`pending → running → blocked → completed | failed`) y produce un resultado. Puede ser creada por un usuario o por una `Activity`.
 
-### Memoria de Corto Plazo (`Short-term Memory`)
-Estado temporal de ejecución de una tarea en curso. Incluye decisiones recientes, salidas parciales y contexto de conversación actual. Vive por `task_id`/`session_id` y expira al cerrar la tarea o al vencer TTL.
+**Activity**
+Entidad persistente y proactiva que genera `Tasks` en respuesta a `Triggers` o eventos del sistema. Representa el comportamiento autónomo sin intervención directa del usuario.
 
-### Memoria de Largo Plazo (`Long-term Memory`)
-Conocimiento persistente entre tareas. Incluye preferencias de usuario, resúmenes de decisiones históricas, lecciones aprendidas y conocimiento indexado para recuperación.
+**Trigger**
+Lo que activa una `Activity`: temporal (`cron`), externo (`webhook`), condicional (umbral de métrica) o reactivo a un evento del sistema.
 
-### RAG (`Retrieval-Augmented Generation`)
-Patrón donde el agente recupera contexto relevante desde memoria/documentos antes de generar su respuesta. En esta arquitectura, RAG se implementa dentro de `Memory Service` (pipeline de ingesta + índice vectorial + recuperación) y se consume desde `Agent Runtime`.
+**Orchestrator**
+Coordinador central. Recibe tareas, selecciona agentes, aplica políticas y consolida resultados. No ejecuta lógica de negocio directamente; delega en agentes y tools.
 
-### Skill Registry
-Componente que descubre, valida, versiona y habilita `skills`.
+**Memory**
+Conocimiento del sistema en dos capas: corto plazo (estado temporal por tarea, con TTL) y largo plazo (persistente entre tareas). Incluye recuperación por similitud (RAG) para enriquecer el contexto del agente antes de cada ejecución.
 
-### Orchestrator
-Coordinador central del sistema. Recibe tareas de usuario, decide agentes participantes, aplica políticas (`timeout`, `retry`, `budget`) y consolida resultados.
+**Message Bus**
+Canal de comunicación interna. Transporta eventos entre componentes (pub/sub) y permite coordinación directa entre agentes (request/reply).
 
-### API Gateway
-Punto de entrada para CLI/UI/API. Expone operaciones de alto nivel como `submit_task`, `get_task_status` y `get_task_result`.
+---
 
-### Message Bus
-Canal de mensajería interna para eventos y request/reply entre componentes. Permite desacoplar productores y consumidores.
+### Organización del trabajo
 
-### Observability
+**Workspace**
+Nivel de agrupación más alto. Agrupa proyectos de un usuario o equipo. Define identidad, permisos globales y contexto de facturación.
+
+**Project**
+Contexto persistente que agrupa tareas relacionadas. Define objetivo general, constraints compartidos, skills habilitadas y scope de memoria larga. Permite que los agentes acumulen conocimiento entre tareas.
+
+---
+
+### Ejecución interna
+
+**Plan**
+Salida del agente `planner`: secuencia ordenada de `Steps` con dependencias y posibles ramificaciones condicionales.
+
+**Step**
+Unidad interna de trabajo generada al descomponer una `Task`. No es visible para el usuario; es interna al `Orchestrator` y al `Agent Runtime`.
+
+**Run**
+Ejecución concreta de una `Task`. Si una tarea se reintenta, pueden existir múltiples `Runs` para la misma `Task`, cada una con su propio `trace_id`.
+
+**Artifact**
+Salida tangible producida por un agente durante una `Run`: archivo, código, documento, diff o datos estructurados.
+
+---
+
+### Gobernanza
+
+**Policy**
+Reglas que el `Orchestrator` aplica sobre tareas y agentes: timeouts, reintentos, presupuesto de tokens/coste, y qué agents/tools están permitidos. Puede definirse a nivel de `Workspace`, `Project` o `Task`.
+
+**Capability**
+Permiso concreto otorgado a un agente o tool. Es la unidad del modelo sandbox. Ejemplos: `fs:read`, `network:external`, `memory:long-term:write`.
+
+---
+
+### Comunicación y trazabilidad
+
+**Event**
+Algo que ocurrió en el sistema. Viaja por el `Message Bus` y puede ser consumido por cualquier suscriptor. Es la unidad fundamental de trazabilidad y de proactividad adaptativa.
+
+**Trace**
+Hilo que une todos los `Events` de una `Task` de principio a fin, identificado por `trace_id`.
+
+---
+
+### Componentes de plataforma
+
+**Agent Runtime**
+Proceso que ejecuta el loop de un agente. Gestiona contexto, selección de `tools`, memoria corta y formato de entrada/salida.
+
+**Tool Gateway**
+Capa única para registrar, validar y ejecutar `tools`. Centraliza seguridad y auditoría de todas las ejecuciones.
+
+**API Gateway**
+Punto de entrada externo. Expone operaciones de alto nivel (`submit_task`, `get_task_status`, `get_task_result`) y normaliza autenticación.
+
+**Skill Registry**
+Componente que descubre, valida y versiona `skills`. Expone el catálogo disponible al `Agent Runtime`.
+
+**Observability**
 Conjunto de logs, métricas y trazas para auditar comportamiento, diagnosticar fallos y medir costos.
 
-### MCP (Model Context Protocol)
-Protocolo para integrar fuentes externas (tools/resources) de forma estándar. En esta arquitectura vive dentro de `Tool Gateway` como adaptador de integración, no como reemplazo de Orchestrator.
+**MCP (Model Context Protocol)**
+Protocolo estándar para integrar fuentes externas (tools/resources). En esta arquitectura vive como adaptador dentro del `Tool Gateway`.
+
+**RAG (Retrieval-Augmented Generation)**
+Técnica donde el agente recupera contexto relevante desde memoria antes de generar su respuesta. Se implementa dentro del `Memory Service` como pipeline de ingesta, indexación y recuperación.
 
 ## 3. Principios de diseño
 - Separar razonamiento (`agents`) de ejecución (`tools`).
@@ -122,19 +179,29 @@ Protocolo para integrar fuentes externas (tools/resources) de forma estándar. E
 
 ```mermaid
 graph TB
-    U([Usuario / Sistema]) --> GW[API Gateway]
-    GW --> ORC[Orchestrator]
-    ORC --> RT[Agent Runtime]
+    subgraph Entrada[" Entrada al sistema "]
+        U([👤 Usuario]) -->|request| GW[API Gateway]
+        TRIG([⚡ Trigger\ncron · webhook · condition]) --> ACT[Activity]
+    end
+
+    GW -->|Task| ORC[Orchestrator]
+    ACT -->|Task| ORC
+    MB -.->|eventos| ACT
+
     ORC <--> MB[Message Bus]
+    ORC --> RT[Agent Runtime]
     RT <--> MB
     RT --> TG[Tool Gateway]
     RT <--> MS[Memory Service]
     SR[Skill Registry] --> RT
+
     TG --> LOCAL[Tools locales]
     TG --> MCP[Adaptador MCP]
-    MS --> REDIS[(Short-term Store · Redis)]
-    MS --> PG[(Long-term Store · Postgres)]
+
+    MS --> REDIS[(Short-term · Redis)]
+    MS --> PG[(Long-term · Postgres)]
     MS --> VEC[(Vector Store)]
+
     OBS{{Observability}} -.-> GW
     OBS -.-> ORC
     OBS -.-> RT
