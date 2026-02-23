@@ -1,0 +1,10 @@
+{
+  "name": "@openagents/runtime",
+  "version": "0.0.1",
+  "private": true,
+  "main": "src/index.ts",
+  "dependencies": {
+    "@openagents/llm-client": "workspace:*",
+    "@openagents/tool-gateway": "workspace:*"
+  }
+}
