@@ -1,0 +1,6 @@
+{
+  "name": "general-assistant",
+  "version": "0.1.0",
+  "description": "Asistente general con acceso al filesystem del sandbox",
+  "triggers": ["default"]
+}
