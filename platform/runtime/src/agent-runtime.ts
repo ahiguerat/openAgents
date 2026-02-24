@@ -105,10 +105,19 @@ export class AgentRuntime {
     }
 
     // ── 4. Construir resultado ───────────────────────────────────────────────
-    const lastMessage = messages.at(-1);
-    const summary = typeof lastMessage?.content === "string"
-      ? lastMessage.content
-      : "Tarea completada.";
+    // Buscar el último mensaje del asistente para el summary
+    const lastAssistantMessage = [...messages].reverse().find((m) => m.role === "assistant");
+    let summary = "Tarea completada.";
+    if (lastAssistantMessage) {
+      if (typeof lastAssistantMessage.content === "string") {
+        summary = lastAssistantMessage.content || "Tarea completada.";
+      } else if (Array.isArray(lastAssistantMessage.content)) {
+        const textBlock = lastAssistantMessage.content.find((b) => b.type === "text");
+        if (textBlock && "text" in textBlock) {
+          summary = textBlock.text as string;
+        }
+      }
+    }
 
     return {
       taskId: task.taskId,
