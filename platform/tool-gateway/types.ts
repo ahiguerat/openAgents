@@ -12,6 +12,7 @@ export interface ToolSpec {
 export interface ToolInvocation {
   toolName: string;
   input: Record<string, unknown>;
+  taskId: string;
   traceId?: string;
 }
 
@@ -24,4 +25,19 @@ export interface ToolResult {
 export interface IToolAdapter {
   spec: ToolSpec;
   invoke(input: Record<string, unknown>, traceId?: string): Promise<ToolResult>;
+}
+
+export interface ToolInvocationLog {
+  level: "info" | "error";
+  message: string;
+  toolName: string;
+  taskId: string;
+  traceId?: string;
+  input?: Record<string, unknown>;
+  output?: Record<string, unknown>;
+  error?: string;
+}
+
+export interface ToolGatewayLogger {
+  log(entry: ToolInvocationLog): void;
 }
