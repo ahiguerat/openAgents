@@ -1,10 +1,43 @@
 import Anthropic from "@anthropic-ai/sdk";
-import type { MessageParam } from "@anthropic-ai/sdk/resources/messages";
 
-export type { MessageParam };
+// ─── Tipos propios del módulo ────────────────────────────────────────────────
+// El resto del sistema solo importa estos tipos, nunca el SDK directamente.
+
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string | ContentBlock[];
+}
+
+export interface ContentBlock {
+  type: "text" | "tool_use" | "tool_result";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [key: string]: any;
+}
+
+export interface ToolSpec {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+export interface LLMResponse {
+  stopReason: "tool_use" | "end_turn";
+  text: string | null;
+  toolCalls: ToolCall[];
+}
 
 export interface LLMClient {
-  chat(messages: MessageParam[], model?: string): Promise<string>;
+  chat(params: {
+    system: string;
+    messages: ChatMessage[];
+    tools: ToolSpec[];
+  }): Promise<LLMResponse>;
 }
 
 export interface LLMClientOptions {
@@ -13,6 +46,8 @@ export interface LLMClientOptions {
   defaultModel?: string;
   timeout?: number;
 }
+
+// ─── Errores ─────────────────────────────────────────────────────────────────
 
 export class LLMError extends Error {
   constructor(
@@ -25,6 +60,8 @@ export class LLMError extends Error {
   }
 }
 
+// ─── Factory ──────────────────────────────────────────────────────────────────
+
 export function createLLMClient(options: LLMClientOptions): LLMClient {
   const client = new Anthropic({
     apiKey: options.apiKey,
@@ -35,20 +72,41 @@ export function createLLMClient(options: LLMClientOptions): LLMClient {
   const defaultModel = options.defaultModel ?? "anthropic/claude-sonnet-4-5";
 
   return {
-    async chat(messages: MessageParam[], model?: string): Promise<string> {
+    async chat({ system, messages, tools }): Promise<LLMResponse> {
       try {
         const response = await client.messages.create({
-          model: model ?? defaultModel,
-          max_tokens: 1024,
-          messages,
+          model: defaultModel,
+          max_tokens: 4096,
+          system,
+          messages: messages as Anthropic.MessageParam[],
+          tools: tools.map((t) => ({
+            name: t.name,
+            description: t.description,
+            input_schema: t.input_schema as Anthropic.Tool["input_schema"],
+          })),
         });
 
-        const content = response.content[0];
-        if (content.type !== "text") {
-          throw new LLMError("Unexpected response type", "api_error");
+        // Extraer texto y tool calls de la respuesta
+        let text: string | null = null;
+        const toolCalls: ToolCall[] = [];
+
+        for (const block of response.content) {
+          if (block.type === "text") {
+            text = block.text;
+          } else if (block.type === "tool_use") {
+            toolCalls.push({
+              id: block.id,
+              name: block.name,
+              input: block.input as Record<string, unknown>,
+            });
+          }
         }
 
-        return content.text;
+        const stopReason = response.stop_reason === "tool_use"
+          ? "tool_use"
+          : "end_turn";
+
+        return { stopReason, text, toolCalls };
       } catch (err) {
         if (err instanceof LLMError) throw err;
 
