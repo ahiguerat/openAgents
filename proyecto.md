@@ -217,6 +217,10 @@ bun run cli
 
 **DoD**: flujo completo funciona desde el terminal sin tocar el API directamente.
 
+> **Nota — URL del Orchestrator configurable**
+>
+> La CLI lee la URL del Orchestrator de `process.env.ORCHESTRATOR_URL`, con fallback a `http://localhost:3000`. Para apuntar a un servidor remoto o en otro puerto basta con exportar la variable antes de ejecutar: `ORCHESTRATOR_URL=http://localhost:3001 bun run cli`.
+
 ---
 
 ### Bloque 6 — Integración E2E
