@@ -129,6 +129,10 @@ toolGateway.getToolSpecs(): ToolSpec[]   // para pasarlas al LLM
 
 **DoD**: `filesystem.read` y `filesystem.write` funcionan y rechazan input inválido.
 
+> **Nota — Módulo MCP (adelantado, inactivo en MVP)**
+>
+> Durante la implementación del Bloque 2 se añadió `platform/tool-gateway/mcp/` con una abstracción para conectar servidores MCP externos (`IMcpClient`, `StubMcpClient`, `McpToolAdapter`, `registerMcpTools`). Este código no se usa en el MVP — el `StubMcpClient` es un stub que no realiza ninguna llamada real. Queda disponible para fases post-MVP cuando se quiera integrar tools externas vía protocolo MCP.
+
 ---
 
 ### Bloque 3 — Agent Runtime + Skill
