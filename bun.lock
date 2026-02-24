@@ -37,6 +37,7 @@
         "@openagents/llm-client": "workspace:*",
         "@openagents/observability": "workspace:*",
         "@openagents/runtime": "workspace:*",
+        "@openagents/tool-gateway": "workspace:*",
         "hono": "^4.7.2",
       },
     },

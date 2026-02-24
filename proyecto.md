@@ -186,6 +186,14 @@ POST /tasks/:id/resume          → { input } → continúa tarea blocked
 
 **DoD**: `POST /tasks` con un goal devuelve `task_id`; el resultado es recuperable en `GET /tasks/:id/result`.
 
+> **Nota — Selección de skill/agente simplificada en MVP**
+>
+> El proyecto describe que el Orchestrator "decide crear un agente y le delega con la skill y tools adecuadas". En la implementación del MVP el Orchestrator siempre delega en el `AgentRuntime` con la skill `general-assistant`, ya que es la única disponible. No hay lógica de selección entre múltiples agentes o skills. Esto es correcto para el scope del MVP — la selección dinámica de agentes se aborda en la Fase 2 del roadmap (Agentes especializados).
+
+> **Nota — `@openagents/observability` pendiente de usar**
+>
+> El `package.json` del orchestrator declara `@openagents/observability` como dependencia, pero el módulo aún está vacío y no se usa. El logging del Bloque 4 se implementó con un `ConsoleLogger` propio. En fases posteriores, cuando `platform/observability/` tenga implementación real (pino, métricas, trazas), el `ConsoleLogger` se sustituirá por él.
+
 ---
 
 ### Bloque 5 — CLI

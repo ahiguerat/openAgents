@@ -9,6 +9,7 @@
   "dependencies": {
     "@openagents/llm-client": "workspace:*",
     "@openagents/runtime": "workspace:*",
+    "@openagents/tool-gateway": "workspace:*",
     "@openagents/observability": "workspace:*",
     "hono": "^4.7.2"
   }
