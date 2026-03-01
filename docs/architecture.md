@@ -13,43 +13,43 @@ flowchart TD
 
     Usuario((👥 Usuario / Sistemas externos)):::user
 
-    subgraph L1 ["1. Capa de Interacción (El Portal)"]
+    subgraph L1 ["1. Capa de Interacción (El Portal)<br/><br/>"]
         direction LR
         UI[Chatbots / UIs]
         GenUI[Generative UI]
         API[APIs REST/gRPC]
     end
 
-    subgraph L2 ["2. Capa de Desarrollo (La Fábrica)"]
+    subgraph L2 ["2. Capa de Desarrollo (La Fábrica)<br/><br/>"]
         direction LR
-        CodeDev["💻 Code-Based\n(CrewAI)"]:::crewai
+        CodeDev["💻 Code-Based<br/>(CrewAI)"]:::crewai
         NoCode["🧩 No-Code/Low-Code"]
         FlowOrch["🔀 Orquestación de Flujos"]
     end
 
-    subgraph L3 ["3. Capa Core (El Corazón de la Ejecución)"]
+    subgraph L3 ["3. Capa Core (El Corazón de la Ejecución)<br/><br/>"]
         direction LR
-        ExecEngine["⚙️ Execution Engine\n(Flows/Tasks de CrewAI)"]:::crewai
-        Memoria["🧠 Gestión de Memoria\n(Unificada por CrewAI)"]:::crewai
+        ExecEngine["⚙️ Execution Engine<br/>(Flows/Tasks de CrewAI)"]:::crewai
+        Memoria["🧠 Gestión de Memoria<br/>(Unificada por CrewAI)"]:::crewai
         Sandbox["📦 Code Sandbox"]
         EventBus["📨 Buses de Eventos"]
     end
 
-    subgraph L4 ["4. Capa de Información (El Contexto)"]
+    subgraph L4 ["4. Capa de Información (El Contexto)<br/><br/>"]
         direction LR
         RAG["📚 Conocimiento (RAG)"]
         OpsData["📊 Datos (SQL/CRM)"]
         DataLake["🗄️ Analytical Data Lake"]
     end
 
-    subgraph L5 ["5. Capa de Fundación (Inteligencia)"]
+    subgraph L5 ["5. Capa de Fundación (Inteligencia)<br/><br/>"]
         direction LR
         Router["🚦 Model Routing"]
         MaaS["🧠 Model-as-a-Service"]
         Cache["⚡ Context Caching"]
     end
 
-    subgraph Transversales ["Capas Transversales (Monitoreo y Validación)"]
+    subgraph Transversales ["Capas Transversales (Monitoreo y Validación)<br/><br/>"]
         direction LR
         Obs["👁️ 6. Observabilidad (Monitoring)"]:::transversales
         Trust["🛡️ 7. Trust (Seguridad y Gobernanza)"]:::transversales
