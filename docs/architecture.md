@@ -136,12 +136,12 @@ Cada capa tiene su propio documento con componentes, interfaces, decisiones téc
 
 | Capa | Documento |
 |------|-----------|
-| 1. Interacción | [01-interaction.md](layers/01-interaction.md) |
-| 2. Desarrollo | [02-development.md](layers/02-development.md) |
-| 3. Core | [03-core.md](layers/03-core.md) |
-| 4. Información | [04-information.md](layers/04-information.md) |
-| 5. Fundación | [05-foundation.md](layers/05-foundation.md) |
-| 6. Observabilidad | [06-observability.md](layers/06-observability.md) |
-| 7. Trust | [07-trust.md](layers/07-trust.md) |
+| 1. Interacción | [01-interaction.md](layers/01-interaction/01-interaction.md) |
+| 2. Desarrollo | [02-development.md](layers/02-development/02-development.md) |
+| 3. Core | [03-core.md](layers/03-core/03-core.md) |
+| 4. Información | [04-information.md](layers/04-information/04-information.md) |
+| 5. Fundación | [05-foundation.md](layers/05-foundation/05-foundation.md) |
+| 6. Observabilidad | [06-observability.md](layers/06-observability/06-observability.md) |
+| 7. Trust | [07-trust.md](layers/07-trust/07-trust.md) |
 
 Las decisiones arquitectónicas se registran en [docs/adr/](adr/).
