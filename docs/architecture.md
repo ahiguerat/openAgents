@@ -21,7 +21,7 @@ La plataforma se organiza en 7 contenedores lógicos. Las capas 1-5 forman el fl
 flowchart TD
     classDef default fill:#f8fafc,stroke:#cbd5e1,stroke-width:1px,color:#334155,rx:5px,ry:5px;
     classDef user fill:#e2e8f0,stroke:#64748b,stroke-width:2px,color:#0f172a,font-weight:bold;
-    classDef crewai fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e,font-weight:bold;
+    classDef highlight fill:#e0f2fe,stroke:#0284c7,stroke-width:2px,color:#0c4a6e,font-weight:bold;
     classDef transversales fill:#f1f5f9,stroke:#94a3b8,stroke-width:2px,stroke-dasharray: 5 5;
     classDef spacer fill:transparent,stroke:transparent,color:transparent;
 
@@ -38,7 +38,7 @@ flowchart TD
     subgraph L2 ["2. Capa de Desarrollo (La Fábrica)"]
         direction LR
         _sp2["　　　　　　　　　　　　　　　　　　　　　　　"]:::spacer
-        CodeDev["💻 Code-Based<br/>(CrewAI)"]:::crewai
+        CodeDev["💻 Code-Based"]:::highlight
         NoCode["🧩 No-Code/Low-Code"]
         FlowOrch["🔀 Orquestación de Flujos"]
     end
@@ -46,8 +46,8 @@ flowchart TD
     subgraph L3 ["3. Capa Core (El Corazón de la Ejecución)"]
         direction LR
         _sp3["　　　　　　　　　　　　　　　　　　　　　　　　　　　　　"]:::spacer
-        ExecEngine["⚙️ Execution Engine<br/>(Flows/Tasks de CrewAI)"]:::crewai
-        Memoria["🧠 Gestión de Memoria<br/>(Unificada por CrewAI)"]:::crewai
+        ExecEngine["⚙️ Execution Engine"]:::highlight
+        Memoria["🧠 Gestión de Memoria"]:::highlight
         Sandbox["📦 Code Sandbox"]
         EventBus["📨 Buses de Eventos"]
     end
@@ -77,7 +77,7 @@ flowchart TD
 
     Usuario -->|Petición| L1
     L1 -->|Activa Flujo| L3
-    L2 -.->|Despliega lógica, Agentes y Crews| L3
+    L2 -.->|Despliega lógica y Agentes| L3
     L3 <-->|Obtiene contexto para no alucinar| L4
     L3 <-->|Delega razonamiento| L5
     Transversales -.->|Audita/Asegura| L1
@@ -87,13 +87,13 @@ flowchart TD
     Transversales -.->|Audita/Asegura| L5
 ```
 
-- **1. Interacción (El Portal)**: Punto de entrada al sistema — chatbots, UIs dinámicas, APIs REST/gRPC y canales externos (Slack, email, voz).
-- **2. Desarrollo (La Fábrica)**: Donde se diseñan y construyen los agentes — en código, mediante builder visual (No-Code), o con orquestación declarativa de flujos.
-- **3. Core (El Corazón)**: Runtime de ejecución — motor de agentes, gestión de memoria, sandbox de código aislado y buses de eventos para comunicación interna.
-- **4. Información (El Contexto)**: Provee los datos que los agentes necesitan — conocimiento indexado (RAG), datos operacionales (SQL/CRM) y data lake analítico.
-- **5. Fundación (Inteligencia)**: Abstracción de los LLMs — enrutamiento inteligente de modelos, acceso multi-proveedor (MaaS) y caché de contexto.
-- **6. Observabilidad**: Trazas, métricas de precisión, evaluación de calidad y control de costes (FinOps).
-- **7. Trust (Seguridad y Gobernanza)**: Identidad y permisos (IAM), guardrails de entrada/salida y registro de agentes y herramientas autorizados.
+- **1. Interacción (El Portal)**: Punto de entrada para usuarios humanos y sistemas externos. Incluye chatbots, UIs personalizadas, Generative UI (interfaces creadas dinámicamente según la intención) y APIs REST/gRPC para integración máquina a máquina. También cubre canales como Slack, email o voz.
+- **2. Desarrollo (La Fábrica)**: Donde se diseñan y construyen los agentes y sus flujos de trabajo. Ofrece tres caminos: desarrollo en código (versionado con Git, CI/CD, despliegue a producción), estudios visuales drag-and-drop para integradores (No-Code/Low-Code), y orquestación declarativa del esqueleto lógico de los flujos.
+- **3. Core (El Corazón)**: Motor en tiempo de ejecución. El Execution Engine gestiona el ciclo cognitivo de los agentes — enrutamiento, lógica condicional, checkpointing y persistencia de estado. La Gestión de Memoria cubre memoria de corto plazo (estado de tarea), largo plazo (conocimiento persistente) y enriquecimiento de contexto. Code Sandbox aísla la ejecución de código en contenedores seguros. Los Buses de Eventos habilitan activación asíncrona.
+- **4. Información (El Contexto)**: Provee los datos que evitan alucinaciones y conectan con la realidad. Conocimiento indexado vía RAG (documentos, manuales, búsqueda semántica), datos operacionales (SQL/CRM) para ejecutar acciones reales, y un data lake analítico para datos históricos complejos.
+- **5. Fundación (Inteligencia)**: Suministra la capacidad de razonamiento. Model Routing despacha peticiones según complejidad (coste vs. capacidad), Model-as-a-Service abstrae el acceso multi-proveedor (OpenAI, Anthropic, Google), y Context Caching reduce consumo de tokens.
+- **6. Observabilidad**: Trazas de ejecución, auditorías, métricas de precisión y FinOps (control de costes).
+- **7. Trust (Seguridad y Gobernanza)**: Identidad y permisos (IAM/RBAC), guardrails de entrada/salida contra inyecciones, y un registry de agentes y herramientas autorizados.
 
 ## Flujo funcional
 

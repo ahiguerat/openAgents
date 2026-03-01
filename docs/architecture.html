@@ -34,7 +34,7 @@
 
     <header class="mb-10 text-center max-w-4xl mx-auto relative">
         <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 mb-4 tracking-tight">Arquitectura PaaS de Agentes IA</h1>
-        <p class="text-lg text-slate-600 mb-6">Diagrama de bloques de los 7 contenedores lógicos que transforman el razonamiento de los LLMs en acciones empresariales, con un enfoque especial en el framework <span class="font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded">CrewAI</span>.</p>
+        <p class="text-lg text-slate-600 mb-6">Diagrama de bloques de los 7 contenedores lógicos que transforman el razonamiento de los LLMs en acciones empresariales, con <span class="font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded">LangGraph</span> como framework base del runtime de agentes.</p>
         
         <!-- Botones de Acción Nuevos -->
         <div class="flex justify-center gap-4">
@@ -55,7 +55,7 @@
                 %% Estilos generales
                 classDef default fill:#f8fafc,stroke:#cbd5e1,stroke-width:1px,color:#334155,rx:5px,ry:5px;
                 classDef user fill:#e2e8f0,stroke:#64748b,stroke-width:2px,color:#0f172a,font-weight:bold;
-                classDef crewai fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e,font-weight:bold;
+                classDef langgraph fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a5f,font-weight:bold;
                 classDef core fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
                 classDef transversales fill:#f1f5f9,stroke:#94a3b8,stroke-width:2px,stroke-dasharray: 5 5;
 
@@ -70,15 +70,15 @@
 
                 subgraph L2 ["2. Capa de Desarrollo (La Fábrica)"]
                     direction LR
-                    CodeDev["💻 Code-Based\n(CrewAI)"]:::crewai
+                    CodeDev["💻 Code-Based\n(LangGraph)"]:::langgraph
                     NoCode["🧩 No-Code/Low-Code"]
                     FlowOrch["🔀 Orquestación de Flujos"]
                 end
 
                 subgraph L3 ["3. Capa Core (El Corazón de la Ejecución)"]
                     direction LR
-                    ExecEngine["⚙️ Execution Engine\n(Flows/Tasks de CrewAI)"]:::crewai
-                    Memoria["🧠 Gestión de Memoria\n(Unificada por CrewAI)"]:::crewai
+                    ExecEngine["⚙️ Execution Engine\n(Grafos de estado)"]:::langgraph
+                    Memoria["🧠 Gestión de Memoria"]
                     Sandbox["📦 Code Sandbox"]
                     EventBus["📨 Buses de Eventos"]
                 end
@@ -106,7 +106,7 @@
                 %% Relaciones principales
                 Usuario -->|Petición| L1
                 L1 -->|Activa Flujo| L3
-                L2 -.->|Despliega lógica, Agentes y Crews| L3
+                L2 -.->|Despliega lógica y Agentes| L3
                 
                 L3 <-->|Obtiene contexto para no alucinar| L4
                 L3 <-->|Delega razonamiento| L5
@@ -157,39 +157,39 @@
         </div>
 
         <!-- Bloque 2 -->
-        <div class="layer-card bg-amber-50 p-6 rounded-xl border border-amber-200 shadow-sm relative overflow-hidden">
-            <div class="absolute top-0 right-0 bg-amber-200 text-amber-800 text-xs font-bold px-3 py-1 rounded-bl-lg">Enfoque CrewAI</div>
-            <h3 class="text-lg font-bold text-amber-900 flex items-center gap-2 mb-3">
-                <span class="bg-amber-200 text-amber-800 w-8 h-8 rounded-full flex items-center justify-center text-sm">2</span> 
+        <div class="layer-card bg-blue-50 p-6 rounded-xl border border-blue-200 shadow-sm relative overflow-hidden">
+            <div class="absolute top-0 right-0 bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1 rounded-bl-lg">LangGraph</div>
+            <h3 class="text-lg font-bold text-blue-900 flex items-center gap-2 mb-3">
+                <span class="bg-blue-200 text-blue-800 w-8 h-8 rounded-full flex items-center justify-center text-sm">2</span>
                 Capa de Desarrollo (La Fábrica)
             </h3>
-            <p class="text-sm text-amber-800 mb-4">Donde se diseñan y construyen los agentes y sus flujos de trabajo.</p>
-            <ul class="space-y-3 text-sm text-amber-900">
-                <li class="bg-white/60 p-2 rounded border border-amber-100">
-                    <i class="fa-solid fa-laptop-code text-amber-600 w-5"></i> <strong>Code-Based (The Developer Path):</strong> <br>
-                    <span class="font-semibold text-amber-700">CrewAI reside explícitamente aquí.</span> Es el framework usado para programar, construir y orquestar la lógica compleja (Crews, Agents, Tasks). Su código se versiona (Git), pasa por CI/CD y se despliega como artefactos listos para producción.
+            <p class="text-sm text-blue-800 mb-4">Donde se diseñan y construyen los agentes y sus flujos de trabajo.</p>
+            <ul class="space-y-3 text-sm text-blue-900">
+                <li class="bg-white/60 p-2 rounded border border-blue-100">
+                    <i class="fa-solid fa-laptop-code text-blue-600 w-5"></i> <strong>Code-Based (The Developer Path):</strong> <br>
+                    <span class="font-semibold text-blue-700">LangGraph es el framework base.</span> Proporciona los primitivos (grafos de estado, nodos, edges, checkpointing) sobre los que la plataforma construye sus propias abstracciones de agentes y flujos. El código se versiona (Git), pasa por CI/CD y se despliega como artefactos listos para producción.
                 </li>
-                <li><i class="fa-solid fa-puzzle-piece text-amber-600 w-5"></i> <strong>No-Code/Low-Code:</strong> Estudios visuales "drag and drop" para integradores.</li>
-                <li><i class="fa-solid fa-project-diagram text-amber-600 w-5"></i> <strong>Orquestación de Flujos:</strong> Definición del esqueleto lógico.</li>
+                <li><i class="fa-solid fa-puzzle-piece text-blue-600 w-5"></i> <strong>No-Code/Low-Code:</strong> Estudios visuales "drag and drop" para integradores.</li>
+                <li><i class="fa-solid fa-project-diagram text-blue-600 w-5"></i> <strong>Orquestación de Flujos:</strong> Definición del esqueleto lógico.</li>
             </ul>
         </div>
 
         <!-- Bloque 3 -->
         <div class="layer-card bg-blue-50 p-6 rounded-xl border border-blue-200 shadow-sm relative">
-             <div class="absolute top-0 right-0 bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1 rounded-bl-lg">Enfoque CrewAI</div>
+             <div class="absolute top-0 right-0 bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1 rounded-bl-lg">LangGraph</div>
             <h3 class="text-lg font-bold text-blue-900 flex items-center gap-2 mb-3">
-                <span class="bg-blue-200 text-blue-800 w-8 h-8 rounded-full flex items-center justify-center text-sm">3</span> 
+                <span class="bg-blue-200 text-blue-800 w-8 h-8 rounded-full flex items-center justify-center text-sm">3</span>
                 Capa Core (El Corazón de la Ejecución)
             </h3>
             <p class="text-sm text-blue-800 mb-4">El motor en tiempo de ejecución impulsado por las abstracciones de desarrollo.</p>
             <ul class="space-y-3 text-sm text-blue-900">
                 <li class="bg-white/60 p-2 rounded border border-blue-100">
-                    <i class="fa-solid fa-microchip text-blue-600 w-5"></i> <strong>Execution Engine:</strong> Maneja el ciclo cognitivo. Utiliza <strong>Flows de CrewAI</strong> para el enrutamiento, lógica condicional, interrupciones manuales y persistencia de estado.
+                    <i class="fa-solid fa-microchip text-blue-600 w-5"></i> <strong>Execution Engine:</strong> Maneja el ciclo cognitivo mediante <strong>grafos de estado (LangGraph)</strong> — enrutamiento, lógica condicional, checkpointing para interrupciones y persistencia de estado.
                 </li>
                 <li class="bg-white/60 p-2 rounded border border-blue-100">
-                    <i class="fa-solid fa-brain text-blue-600 w-5"></i> <strong>Gestión de Memoria:</strong> <strong>CrewAI implementa esta memoria unificada</strong> (corto plazo/RAG, largo plazo/SQLite, entidad, procedimental) permitiendo recordar contexto y aprender.
+                    <i class="fa-solid fa-brain text-blue-600 w-5"></i> <strong>Gestión de Memoria:</strong> <strong>Diseño propio de la plataforma</strong> — memoria de corto plazo (estado de tarea), largo plazo (conocimiento persistente) y RAG para enriquecimiento de contexto.
                 </li>
-                <li><i class="fa-solid fa-box text-blue-600 w-5"></i> <strong>Code Sandbox:</strong> Contenedores Docker aislados y seguros.</li>
+                <li><i class="fa-solid fa-box text-blue-600 w-5"></i> <strong>Code Sandbox:</strong> Contenedores aislados y seguros para ejecución de código.</li>
                 <li><i class="fa-solid fa-bolt text-blue-600 w-5"></i> <strong>Buses de Eventos:</strong> Activación asíncrona ante eventos.</li>
             </ul>
         </div>
@@ -257,7 +257,7 @@
         </div>
         <div id="chat-history" class="flex-1 p-4 overflow-y-auto flex flex-col gap-3 bg-slate-50 text-sm">
             <div class="bg-indigo-100 text-indigo-900 p-3 rounded-xl rounded-tl-none self-start max-w-[85%] shadow-sm">
-                ¡Hola! Soy tu asistente impulsado por Gemini. ¿Tienes alguna duda sobre la arquitectura PaaS o cómo encaja CrewAI en el ecosistema?
+                ¡Hola! Soy tu asistente impulsado por Gemini. ¿Tienes alguna duda sobre la arquitectura PaaS o cómo encaja LangGraph en el ecosistema?
             </div>
         </div>
         <div class="p-3 bg-white border-t border-slate-100 flex gap-2">
@@ -269,7 +269,7 @@
     <script>
         // Función para exportar a Markdown
         function downloadMarkdown() {
-            const mdContent = `# Arquitectura PaaS de Agentes IA\n\nDiagrama de bloques de los 7 contenedores lógicos que transforman el razonamiento de los LLMs en acciones empresariales, con un enfoque especial en el framework **CrewAI**.\n\n## Diagrama de Bloques Funcional\n\n\`\`\`mermaid\nflowchart TD\n    classDef default fill:#f8fafc,stroke:#cbd5e1,stroke-width:1px,color:#334155,rx:5px,ry:5px;\n    classDef user fill:#e2e8f0,stroke:#64748b,stroke-width:2px,color:#0f172a,font-weight:bold;\n    classDef crewai fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e,font-weight:bold;\n    classDef transversales fill:#f1f5f9,stroke:#94a3b8,stroke-width:2px,stroke-dasharray: 5 5;\n\n    Usuario((👥 Usuario / Sistemas externos)):::user\n\n    subgraph L1 ["1. Capa de Interacción (El Portal)"]\n        direction LR\n        UI[Chatbots / UIs]\n        GenUI[Generative UI]\n        API[APIs REST/gRPC]\n    end\n\n    subgraph L2 ["2. Capa de Desarrollo (La Fábrica)"]\n        direction LR\n        CodeDev["💻 Code-Based\\n(CrewAI)"]:::crewai\n        NoCode["🧩 No-Code/Low-Code"]\n        FlowOrch["🔀 Orquestación de Flujos"]\n    end\n\n    subgraph L3 ["3. Capa Core (El Corazón de la Ejecución)"]\n        direction LR\n        ExecEngine["⚙️ Execution Engine\\n(Flows/Tasks de CrewAI)"]:::crewai\n        Memoria["🧠 Gestión de Memoria\\n(Unificada por CrewAI)"]:::crewai\n        Sandbox["📦 Code Sandbox"]\n        EventBus["📨 Buses de Eventos"]\n    end\n\n    subgraph L4 ["4. Capa de Información (El Contexto)"]\n        direction LR\n        RAG["📚 Conocimiento (RAG)"]\n        OpsData["📊 Datos (SQL/CRM)"]\n        DataLake["🗄️ Analytical Data Lake"]\n    end\n\n    subgraph L5 ["5. Capa de Fundación (Inteligencia)"]\n        direction LR\n        Router["🚦 Model Routing"]\n        MaaS["🧠 Model-as-a-Service"]\n        Cache["⚡ Context Caching"]\n    end\n\n    subgraph Transversales ["Capas Transversales (Monitoreo y Validación)"]\n        direction LR\n        Obs["👁️ 6. Observabilidad (Monitoring)"]:::transversales\n        Trust["🛡️ 7. Trust (Seguridad y Gobernanza)"]:::transversales\n    end\n\n    Usuario -->|Petición| L1\n    L1 -->|Activa Flujo| L3\n    L2 -.->|Despliega lógica, Agentes y Crews| L3\n    L3 <-->|Obtiene contexto para no alucinar| L4\n    L3 <-->|Delega razonamiento| L5\n    Transversales -.->|Audita/Asegura| L1\n    Transversales -.->|Audita/Asegura| L2\n    Transversales -.->|Audita/Asegura| L3\n    Transversales -.->|Audita/Asegura| L4\n    Transversales -.->|Audita/Asegura| L5\n\`\`\`\n\n## Flujo Funcional Simplificado\n1. **Usuario envía petición por Interacción.**\n2. **El Core activa el flujo diseñado en Desarrollo.**\n3. **Agente consulta Información y pide razonamiento a Fundación.**\n4. **Todo se valida por Trust y Observabilidad.**\n\n*Nota: Para el detalle completo de las capas, revisa el archivo original.*`;
+            const mdContent = `# Arquitectura PaaS de Agentes IA\n\nDiagrama de bloques de los 7 contenedores lógicos que transforman el razonamiento de los LLMs en acciones empresariales, con un enfoque en **LangGraph** como runtime de grafos de estado.\n\n## Diagrama de Bloques Funcional\n\n\`\`\`mermaid\nflowchart TD\n    classDef default fill:#f8fafc,stroke:#cbd5e1,stroke-width:1px,color:#334155,rx:5px,ry:5px;\n    classDef user fill:#e2e8f0,stroke:#64748b,stroke-width:2px,color:#0f172a,font-weight:bold;\n    classDef langgraph fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a5f,font-weight:bold;\n    classDef transversales fill:#f1f5f9,stroke:#94a3b8,stroke-width:2px,stroke-dasharray: 5 5;\n\n    Usuario((👥 Usuario / Sistemas externos)):::user\n\n    subgraph L1 ["1. Capa de Interacción (El Portal)"]\n        direction LR\n        UI[Chatbots / UIs]\n        GenUI[Generative UI]\n        API[APIs REST/gRPC]\n    end\n\n    subgraph L2 ["2. Capa de Desarrollo (La Fábrica)"]\n        direction LR\n        CodeDev["💻 Code-Based\\n(LangGraph)"]:::langgraph\n        NoCode["🧩 No-Code/Low-Code"]\n        FlowOrch["🔀 Orquestación de Flujos"]\n    end\n\n    subgraph L3 ["3. Capa Core (El Corazón de la Ejecución)"]\n        direction LR\n        ExecEngine["⚙️ Execution Engine\\n(Grafos de Estado)"]:::langgraph\n        Memoria["🧠 Gestión de Memoria\\n(Memory Service Propio)"]:::langgraph\n        Sandbox["📦 Code Sandbox"]\n        EventBus["📨 Buses de Eventos"]\n    end\n\n    subgraph L4 ["4. Capa de Información (El Contexto)"]\n        direction LR\n        RAG["📚 Conocimiento (RAG)"]\n        OpsData["📊 Datos (SQL/CRM)"]\n        DataLake["🗄️ Analytical Data Lake"]\n    end\n\n    subgraph L5 ["5. Capa de Fundación (Inteligencia)"]\n        direction LR\n        Router["🚦 Model Routing"]\n        MaaS["🧠 Model-as-a-Service"]\n        Cache["⚡ Context Caching"]\n    end\n\n    subgraph Transversales ["Capas Transversales (Monitoreo y Validación)"]\n        direction LR\n        Obs["👁️ 6. Observabilidad (Monitoring)"]:::transversales\n        Trust["🛡️ 7. Trust (Seguridad y Gobernanza)"]:::transversales\n    end\n\n    Usuario -->|Petición| L1\n    L1 -->|Activa Flujo| L3\n    L2 -.->|Despliega lógica y Agentes| L3\n    L3 <-->|Obtiene contexto para no alucinar| L4\n    L3 <-->|Delega razonamiento| L5\n    Transversales -.->|Audita/Asegura| L1\n    Transversales -.->|Audita/Asegura| L2\n    Transversales -.->|Audita/Asegura| L3\n    Transversales -.->|Audita/Asegura| L4\n    Transversales -.->|Audita/Asegura| L5\n\`\`\`\n\n## Flujo Funcional Simplificado\n1. **Usuario envía petición por Interacción.**\n2. **El Core activa el flujo diseñado en Desarrollo.**\n3. **Agente consulta Información y pide razonamiento a Fundación.**\n4. **Todo se valida por Trust y Observabilidad.**\n\n*Nota: Para el detalle completo de las capas, revisa el archivo original.*`;
             
             const blob = new Blob([mdContent], { type: 'text/markdown' });
             const url = URL.createObjectURL(blob);
@@ -321,7 +321,7 @@
             const loadingId = addLoadingIndicator();
 
             try {
-                const systemPrompt = "Eres un asistente experto en la Arquitectura de Plataforma como Servicio (PaaS) para Agentes de IA, con un enfoque en el framework CrewAI. Responde de manera concisa y útil a las dudas del usuario basándote en los 7 contenedores lógicos que tienes de contexto: Interacción, Desarrollo, Core, Información, Fundación, Observabilidad y Trust.";
+                const systemPrompt = "Eres un asistente experto en la Arquitectura de Plataforma como Servicio (PaaS) para Agentes de IA, con LangGraph como framework base del runtime. Responde de manera concisa y útil a las dudas del usuario basándote en los 7 contenedores lógicos que tienes de contexto: Interacción, Desarrollo, Core, Información, Fundación, Observabilidad y Trust.";
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
                 
                 const payload = {
