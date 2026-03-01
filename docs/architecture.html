@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagrama de Bloques: Plataforma de Agentes IA (PaaS)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'base', themeVariables: {
+            primaryColor: '#f1f5f9',
+            primaryTextColor: '#0f172a',
+            primaryBorderColor: '#cbd5e1',
+            lineColor: '#64748b',
+            secondaryColor: '#e0f2fe',
+            tertiaryColor: '#fef08a'
+        }});
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .layer-card { transition: all 0.3s ease; }
+        .layer-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+        
+        /* Nuevos estilos para el chat flotante del Asistente Gemini */
+        #chat-panel { transition: transform 0.3s ease-in-out; }
+        .chat-open { transform: translateY(0); }
+        .chat-closed { transform: translateY(150%); }
+        .dot-flashing { animation: dot-flashing 1s infinite linear alternate; }
+        @keyframes dot-flashing { 0% { opacity: 0.2; } 50%, 100% { opacity: 1; } }
+    </style>
+</head>
+<body class="text-slate-800 p-4 md:p-8 lg:px-16 pb-20">
+
+    <header class="mb-10 text-center max-w-4xl mx-auto relative">
+        <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 mb-4 tracking-tight">Arquitectura PaaS de Agentes IA</h1>
+        <p class="text-lg text-slate-600 mb-6">Diagrama de bloques de los 7 contenedores lógicos que transforman el razonamiento de los LLMs en acciones empresariales, con un enfoque especial en el framework <span class="font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded">CrewAI</span>.</p>
+        
+        <!-- Botones de Acción Nuevos -->
+        <div class="flex justify-center gap-4">
+            <button onclick="downloadMarkdown()" class="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition shadow-sm flex items-center gap-2">
+                <i class="fa-brands fa-markdown text-lg"></i> Exportar a Markdown
+            </button>
+            <button onclick="toggleChat()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition shadow-sm flex items-center gap-2">
+                <i class="fa-solid fa-sparkles"></i> Asistente de IA
+            </button>
+        </div>
+    </header>
+
+    <!-- Sección del Diagrama Visual -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-2 md:p-6 mb-12 overflow-x-auto">
+        <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-sitemap text-indigo-500"></i> Diagrama de Bloques Funcional</h2>
+        <div class="mermaid flex justify-center">
+            flowchart TD
+                %% Estilos generales
+                classDef default fill:#f8fafc,stroke:#cbd5e1,stroke-width:1px,color:#334155,rx:5px,ry:5px;
+                classDef user fill:#e2e8f0,stroke:#64748b,stroke-width:2px,color:#0f172a,font-weight:bold;
+                classDef crewai fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e,font-weight:bold;
+                classDef core fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+                classDef transversales fill:#f1f5f9,stroke:#94a3b8,stroke-width:2px,stroke-dasharray: 5 5;
+
+                Usuario((👥 Usuario / Sistemas externos)):::user
+
+                subgraph L1 ["1. Capa de Interacción (El Portal)"]
+                    direction LR
+                    UI[Chatbots / UIs]
+                    GenUI[Generative UI]
+                    API[APIs REST/gRPC]
+                end
+
+                subgraph L2 ["2. Capa de Desarrollo (La Fábrica)"]
+                    direction LR
+                    CodeDev["💻 Code-Based\n(CrewAI)"]:::crewai
+                    NoCode["🧩 No-Code/Low-Code"]
+                    FlowOrch["🔀 Orquestación de Flujos"]
+                end
+
+                subgraph L3 ["3. Capa Core (El Corazón de la Ejecución)"]
+                    direction LR
+                    ExecEngine["⚙️ Execution Engine\n(Flows/Tasks de CrewAI)"]:::crewai
+                    Memoria["🧠 Gestión de Memoria\n(Unificada por CrewAI)"]:::crewai
+                    Sandbox["📦 Code Sandbox"]
+                    EventBus["📨 Buses de Eventos"]
+                end
+
+                subgraph L4 ["4. Capa de Información (El Contexto)"]
+                    direction LR
+                    RAG["📚 Conocimiento (RAG)"]
+                    OpsData["📊 Datos (SQL/CRM)"]
+                    DataLake["🗄️ Analytical Data Lake"]
+                end
+
+                subgraph L5 ["5. Capa de Fundación (Inteligencia)"]
+                    direction LR
+                    Router["🚦 Model Routing"]
+                    MaaS["🧠 Model-as-a-Service"]
+                    Cache["⚡ Context Caching"]
+                end
+
+                subgraph Transversales ["Capas Transversales (Monitoreo y Validación)"]
+                    direction LR
+                    Obs["👁️ 6. Observabilidad (Monitoring)"]:::transversales
+                    Trust["🛡️ 7. Trust (Seguridad y Gobernanza)"]:::transversales
+                end
+
+                %% Relaciones principales
+                Usuario -->|Petición| L1
+                L1 -->|Activa Flujo| L3
+                L2 -.->|Despliega lógica, Agentes y Crews| L3
+                
+                L3 <-->|Obtiene contexto para no alucinar| L4
+                L3 <-->|Delega razonamiento| L5
+
+                %% Relaciones transversales (envolventes)
+                Transversales -.->|Audita/Asegura| L1
+                Transversales -.->|Audita/Asegura| L2
+                Transversales -.->|Audita/Asegura| L3
+                Transversales -.->|Audita/Asegura| L4
+                Transversales -.->|Audita/Asegura| L5
+        </div>
+    </section>
+
+    <!-- Flujo Simplificado -->
+    <section class="bg-indigo-50 rounded-2xl border border-indigo-100 p-6 mb-12">
+        <h2 class="text-xl font-bold text-indigo-900 mb-4 flex items-center gap-2"><i class="fa-solid fa-route"></i> Flujo Funcional Simplificado</h2>
+        <ol class="flex flex-col md:flex-row gap-4 items-start md:items-center text-sm md:text-base text-indigo-800">
+            <li class="flex-1 bg-white p-3 rounded-lg shadow-sm border border-indigo-100"><strong>1.</strong> Usuario envía petición por <span class="font-semibold text-indigo-600">Interacción</span>.</li>
+            <i class="fa-solid fa-arrow-right hidden md:block text-indigo-300"></i>
+            <i class="fa-solid fa-arrow-down md:hidden text-indigo-300 ml-4"></i>
+            <li class="flex-1 bg-white p-3 rounded-lg shadow-sm border border-indigo-100"><strong>2.</strong> El <span class="font-semibold text-indigo-600">Core</span> activa el flujo diseñado en <span class="font-semibold text-indigo-600">Desarrollo</span>.</li>
+            <i class="fa-solid fa-arrow-right hidden md:block text-indigo-300"></i>
+            <i class="fa-solid fa-arrow-down md:hidden text-indigo-300 ml-4"></i>
+            <li class="flex-1 bg-white p-3 rounded-lg shadow-sm border border-indigo-100"><strong>3.</strong> Agente consulta <span class="font-semibold text-indigo-600">Información</span> y pide razonamiento a <span class="font-semibold text-indigo-600">Fundación</span>.</li>
+            <i class="fa-solid fa-arrow-right hidden md:block text-indigo-300"></i>
+            <i class="fa-solid fa-arrow-down md:hidden text-indigo-300 ml-4"></i>
+            <li class="flex-1 bg-white p-3 rounded-lg shadow-sm border border-indigo-100"><strong>4.</strong> Todo se valida por <span class="font-semibold text-indigo-600">Trust</span> y <span class="font-semibold text-indigo-600">Observabilidad</span>.</li>
+        </ol>
+    </section>
+
+    <!-- Desglose de Capas -->
+    <h2 class="text-2xl font-bold mb-6 text-slate-800 border-b pb-2">Desglose Detallado de Contenedores</h2>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Bloque 1 -->
+        <div class="layer-card bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 mb-3">
+                <span class="bg-slate-100 text-slate-600 w-8 h-8 rounded-full flex items-center justify-center text-sm">1</span> 
+                Capa de Interacción (El Portal)
+            </h3>
+            <p class="text-sm text-slate-600 mb-4">El punto de entrada para usuarios humanos y sistemas externos.</p>
+            <ul class="space-y-2 text-sm text-slate-700">
+                <li><i class="fa-solid fa-desktop text-slate-400 w-5"></i> <strong>Interfaces de Usuario:</strong> Chatbots, UIs personalizadas, Slack, Email, Voz.</li>
+                <li><i class="fa-solid fa-wand-magic-sparkles text-slate-400 w-5"></i> <strong>Generative UI:</strong> Interfaces dinámicas creadas on-the-fly según la intención.</li>
+                <li><i class="fa-solid fa-code text-slate-400 w-5"></i> <strong>APIs (REST/gRPC):</strong> Interfaz máquina a máquina para delegar tareas.</li>
+            </ul>
+        </div>
+
+        <!-- Bloque 2 -->
+        <div class="layer-card bg-amber-50 p-6 rounded-xl border border-amber-200 shadow-sm relative overflow-hidden">
+            <div class="absolute top-0 right-0 bg-amber-200 text-amber-800 text-xs font-bold px-3 py-1 rounded-bl-lg">Enfoque CrewAI</div>
+            <h3 class="text-lg font-bold text-amber-900 flex items-center gap-2 mb-3">
+                <span class="bg-amber-200 text-amber-800 w-8 h-8 rounded-full flex items-center justify-center text-sm">2</span> 
+                Capa de Desarrollo (La Fábrica)
+            </h3>
+            <p class="text-sm text-amber-800 mb-4">Donde se diseñan y construyen los agentes y sus flujos de trabajo.</p>
+            <ul class="space-y-3 text-sm text-amber-900">
+                <li class="bg-white/60 p-2 rounded border border-amber-100">
+                    <i class="fa-solid fa-laptop-code text-amber-600 w-5"></i> <strong>Code-Based (The Developer Path):</strong> <br>
+                    <span class="font-semibold text-amber-700">CrewAI reside explícitamente aquí.</span> Es el framework usado para programar, construir y orquestar la lógica compleja (Crews, Agents, Tasks). Su código se versiona (Git), pasa por CI/CD y se despliega como artefactos listos para producción.
+                </li>
+                <li><i class="fa-solid fa-puzzle-piece text-amber-600 w-5"></i> <strong>No-Code/Low-Code:</strong> Estudios visuales "drag and drop" para integradores.</li>
+                <li><i class="fa-solid fa-project-diagram text-amber-600 w-5"></i> <strong>Orquestación de Flujos:</strong> Definición del esqueleto lógico.</li>
+            </ul>
+        </div>
+
+        <!-- Bloque 3 -->
+        <div class="layer-card bg-blue-50 p-6 rounded-xl border border-blue-200 shadow-sm relative">
+             <div class="absolute top-0 right-0 bg-blue-200 text-blue-800 text-xs font-bold px-3 py-1 rounded-bl-lg">Enfoque CrewAI</div>
+            <h3 class="text-lg font-bold text-blue-900 flex items-center gap-2 mb-3">
+                <span class="bg-blue-200 text-blue-800 w-8 h-8 rounded-full flex items-center justify-center text-sm">3</span> 
+                Capa Core (El Corazón de la Ejecución)
+            </h3>
+            <p class="text-sm text-blue-800 mb-4">El motor en tiempo de ejecución impulsado por las abstracciones de desarrollo.</p>
+            <ul class="space-y-3 text-sm text-blue-900">
+                <li class="bg-white/60 p-2 rounded border border-blue-100">
+                    <i class="fa-solid fa-microchip text-blue-600 w-5"></i> <strong>Execution Engine:</strong> Maneja el ciclo cognitivo. Utiliza <strong>Flows de CrewAI</strong> para el enrutamiento, lógica condicional, interrupciones manuales y persistencia de estado.
+                </li>
+                <li class="bg-white/60 p-2 rounded border border-blue-100">
+                    <i class="fa-solid fa-brain text-blue-600 w-5"></i> <strong>Gestión de Memoria:</strong> <strong>CrewAI implementa esta memoria unificada</strong> (corto plazo/RAG, largo plazo/SQLite, entidad, procedimental) permitiendo recordar contexto y aprender.
+                </li>
+                <li><i class="fa-solid fa-box text-blue-600 w-5"></i> <strong>Code Sandbox:</strong> Contenedores Docker aislados y seguros.</li>
+                <li><i class="fa-solid fa-bolt text-blue-600 w-5"></i> <strong>Buses de Eventos:</strong> Activación asíncrona ante eventos.</li>
+            </ul>
+        </div>
+
+        <!-- Bloque 4 -->
+        <div class="layer-card bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 mb-3">
+                <span class="bg-slate-100 text-slate-600 w-8 h-8 rounded-full flex items-center justify-center text-sm">4</span> 
+                Capa de Información (El Contexto)
+            </h3>
+            <p class="text-sm text-slate-600 mb-4">Provee los datos necesarios para evitar alucinaciones y conectar con la realidad.</p>
+            <ul class="space-y-2 text-sm text-slate-700">
+                <li><i class="fa-solid fa-book-open text-slate-400 w-5"></i> <strong>Conocimiento (RAG):</strong> Indexación de PDFs, manuales, búsqueda semántica.</li>
+                <li><i class="fa-solid fa-database text-slate-400 w-5"></i> <strong>Datos Operacionales:</strong> Acceso a SQL/CRM vía APIs para ejecutar acciones reales.</li>
+                <li><i class="fa-solid fa-chart-pie text-slate-400 w-5"></i> <strong>Analytical Data Lake:</strong> Acceso a datos históricos complejos.</li>
+            </ul>
+        </div>
+
+        <!-- Bloque 5 -->
+        <div class="layer-card bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+            <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2 mb-3">
+                <span class="bg-slate-100 text-slate-600 w-8 h-8 rounded-full flex items-center justify-center text-sm">5</span> 
+                Capa de Fundación (Inteligencia e Infraestructura)
+            </h3>
+            <p class="text-sm text-slate-600 mb-4">Suministra la capacidad de cómputo y los modelos de lenguaje (LLMs).</p>
+            <ul class="space-y-2 text-sm text-slate-700">
+                <li><i class="fa-solid fa-network-wired text-slate-400 w-5"></i> <strong>Model Routing:</strong> Despacho inteligente según complejidad (costo vs. capacidad).</li>
+                <li><i class="fa-solid fa-cloud text-slate-400 w-5"></i> <strong>Model-as-a-Service (MaaS):</strong> Abstracción de OpenAI, Anthropic, Google.</li>
+                <li><i class="fa-solid fa-memory text-slate-400 w-5"></i> <strong>Context Caching:</strong> Almacenamiento de sistema para ahorrar tokens.</li>
+            </ul>
+        </div>
+
+        <!-- Bloque 6 & 7 (Transversales) -->
+        <div class="layer-card bg-slate-800 p-6 rounded-xl border border-slate-700 shadow-sm text-slate-200">
+            <h3 class="text-lg font-bold text-white flex items-center gap-2 mb-3">
+                <span class="bg-slate-600 text-white w-8 h-8 rounded-full flex items-center justify-center text-sm">6&7</span> 
+                Capas Transversales
+            </h3>
+            <p class="text-sm text-slate-400 mb-4">Envuelven el sistema para garantizar fiabilidad y seguridad.</p>
+            
+            <div class="mb-4">
+                <h4 class="font-bold text-slate-300 border-b border-slate-600 pb-1 mb-2">6. Observabilidad</h4>
+                <ul class="space-y-1 text-sm">
+                    <li><i class="fa-solid fa-chart-line text-emerald-400 w-5"></i> Monitoring: Trazas, auditorías, métricas de precisión y FinOps (costos).</li>
+                </ul>
+            </div>
+            
+            <div>
+                <h4 class="font-bold text-slate-300 border-b border-slate-600 pb-1 mb-2">7. Trust (Seguridad y Gobernanza)</h4>
+                <ul class="space-y-1 text-sm">
+                    <li><i class="fa-solid fa-id-badge text-blue-400 w-5"></i> <strong>IAM:</strong> Identidades y permisos (RBAC).</li>
+                    <li><i class="fa-solid fa-shield-halved text-blue-400 w-5"></i> <strong>Guardrails:</strong> Filtros de inyecciones y validación de entrada/salida.</li>
+                    <li><i class="fa-solid fa-book-bookmark text-blue-400 w-5"></i> <strong>Registry:</strong> Catálogo de agentes y herramientas autorizados.</li>
+                </ul>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Panel flotante del Asistente Gemini -->
+    <div id="chat-panel" class="chat-closed fixed bottom-4 right-4 md:bottom-8 md:right-8 w-[90%] md:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col z-50 overflow-hidden h-[500px] max-h-[80vh]">
+        <div class="bg-indigo-600 text-white p-4 flex justify-between items-center">
+            <h3 class="font-bold flex items-center gap-2"><i class="fa-solid fa-sparkles text-indigo-200"></i> Asistente de Arquitectura</h3>
+            <button onclick="toggleChat()" class="text-indigo-200 hover:text-white transition"><i class="fa-solid fa-times text-lg"></i></button>
+        </div>
+        <div id="chat-history" class="flex-1 p-4 overflow-y-auto flex flex-col gap-3 bg-slate-50 text-sm">
+            <div class="bg-indigo-100 text-indigo-900 p-3 rounded-xl rounded-tl-none self-start max-w-[85%] shadow-sm">
+                ¡Hola! Soy tu asistente impulsado por Gemini. ¿Tienes alguna duda sobre la arquitectura PaaS o cómo encaja CrewAI en el ecosistema?
+            </div>
+        </div>
+        <div class="p-3 bg-white border-t border-slate-100 flex gap-2">
+            <input type="text" id="chat-input" placeholder="Pregunta algo sobre el diagrama..." class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" onkeypress="if(event.key === 'Enter') sendQuery()">
+            <button onclick="sendQuery()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg transition"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
+    </div>
+
+    <script>
+        // Función para exportar a Markdown
+        function downloadMarkdown() {
+            const mdContent = `# Arquitectura PaaS de Agentes IA\n\nDiagrama de bloques de los 7 contenedores lógicos que transforman el razonamiento de los LLMs en acciones empresariales, con un enfoque especial en el framework **CrewAI**.\n\n## Diagrama de Bloques Funcional\n\n\`\`\`mermaid\nflowchart TD\n    classDef default fill:#f8fafc,stroke:#cbd5e1,stroke-width:1px,color:#334155,rx:5px,ry:5px;\n    classDef user fill:#e2e8f0,stroke:#64748b,stroke-width:2px,color:#0f172a,font-weight:bold;\n    classDef crewai fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e,font-weight:bold;\n    classDef transversales fill:#f1f5f9,stroke:#94a3b8,stroke-width:2px,stroke-dasharray: 5 5;\n\n    Usuario((👥 Usuario / Sistemas externos)):::user\n\n    subgraph L1 ["1. Capa de Interacción (El Portal)"]\n        direction LR\n        UI[Chatbots / UIs]\n        GenUI[Generative UI]\n        API[APIs REST/gRPC]\n    end\n\n    subgraph L2 ["2. Capa de Desarrollo (La Fábrica)"]\n        direction LR\n        CodeDev["💻 Code-Based\\n(CrewAI)"]:::crewai\n        NoCode["🧩 No-Code/Low-Code"]\n        FlowOrch["🔀 Orquestación de Flujos"]\n    end\n\n    subgraph L3 ["3. Capa Core (El Corazón de la Ejecución)"]\n        direction LR\n        ExecEngine["⚙️ Execution Engine\\n(Flows/Tasks de CrewAI)"]:::crewai\n        Memoria["🧠 Gestión de Memoria\\n(Unificada por CrewAI)"]:::crewai\n        Sandbox["📦 Code Sandbox"]\n        EventBus["📨 Buses de Eventos"]\n    end\n\n    subgraph L4 ["4. Capa de Información (El Contexto)"]\n        direction LR\n        RAG["📚 Conocimiento (RAG)"]\n        OpsData["📊 Datos (SQL/CRM)"]\n        DataLake["🗄️ Analytical Data Lake"]\n    end\n\n    subgraph L5 ["5. Capa de Fundación (Inteligencia)"]\n        direction LR\n        Router["🚦 Model Routing"]\n        MaaS["🧠 Model-as-a-Service"]\n        Cache["⚡ Context Caching"]\n    end\n\n    subgraph Transversales ["Capas Transversales (Monitoreo y Validación)"]\n        direction LR\n        Obs["👁️ 6. Observabilidad (Monitoring)"]:::transversales\n        Trust["🛡️ 7. Trust (Seguridad y Gobernanza)"]:::transversales\n    end\n\n    Usuario -->|Petición| L1\n    L1 -->|Activa Flujo| L3\n    L2 -.->|Despliega lógica, Agentes y Crews| L3\n    L3 <-->|Obtiene contexto para no alucinar| L4\n    L3 <-->|Delega razonamiento| L5\n    Transversales -.->|Audita/Asegura| L1\n    Transversales -.->|Audita/Asegura| L2\n    Transversales -.->|Audita/Asegura| L3\n    Transversales -.->|Audita/Asegura| L4\n    Transversales -.->|Audita/Asegura| L5\n\`\`\`\n\n## Flujo Funcional Simplificado\n1. **Usuario envía petición por Interacción.**\n2. **El Core activa el flujo diseñado en Desarrollo.**\n3. **Agente consulta Información y pide razonamiento a Fundación.**\n4. **Todo se valida por Trust y Observabilidad.**\n\n*Nota: Para el detalle completo de las capas, revisa el archivo original.*`;
+            
+            const blob = new Blob([mdContent], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'arquitectura_agentes_paas.md';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // --- Lógica del Asistente Gemini API ---
+        const apiKey = ""; // API Key insertada dinámicamente por el entorno
+        
+        function toggleChat() {
+            const panel = document.getElementById('chat-panel');
+            panel.classList.toggle('chat-closed');
+            panel.classList.toggle('chat-open');
+            if(panel.classList.contains('chat-open')) {
+                document.getElementById('chat-input').focus();
+            }
+        }
+
+        async function fetchWithRetry(url, options, retries = 5) {
+            const delays = [1000, 2000, 4000, 8000, 16000];
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return await response.json();
+                } catch (error) {
+                    if (i === retries - 1) throw error;
+                    await new Promise(res => setTimeout(res, delays[i]));
+                }
+            }
+        }
+
+        async function sendQuery() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            // Limpiar input y agregar mensaje del usuario
+            input.value = '';
+            addMessageToChat(text, 'user');
+            
+            // Mostrar indicador de carga
+            const loadingId = addLoadingIndicator();
+
+            try {
+                const systemPrompt = "Eres un asistente experto en la Arquitectura de Plataforma como Servicio (PaaS) para Agentes de IA, con un enfoque en el framework CrewAI. Responde de manera concisa y útil a las dudas del usuario basándote en los 7 contenedores lógicos que tienes de contexto: Interacción, Desarrollo, Core, Información, Fundación, Observabilidad y Trust.";
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                
+                const payload = {
+                    contents: [{ parts: [{ text: text }] }],
+                    systemInstruction: { parts: [{ text: systemPrompt }] }
+                };
+
+                const result = await fetchWithRetry(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const responseText = result.candidates?.[0]?.content?.parts?.[0]?.text || "Lo siento, no pude procesar tu consulta.";
+                
+                removeElement(loadingId);
+                addMessageToChat(responseText, 'bot');
+
+            } catch (error) {
+                removeElement(loadingId);
+                addMessageToChat("Error de conexión con la IA. Por favor, intenta de nuevo más tarde.", 'error');
+            }
+        }
+
+        function addMessageToChat(text, sender) {
+            const chatHistory = document.getElementById('chat-history');
+            const msgDiv = document.createElement('div');
+            
+            // Renderizar negritas simples
+            const formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+            if (sender === 'user') {
+                msgDiv.className = "bg-white border border-slate-200 text-slate-800 p-3 rounded-xl rounded-tr-none self-end max-w-[85%] shadow-sm";
+            } else if (sender === 'error') {
+                msgDiv.className = "bg-red-50 text-red-800 border border-red-200 p-3 rounded-xl self-start max-w-[85%] shadow-sm";
+            } else {
+                msgDiv.className = "bg-indigo-100 text-indigo-900 p-3 rounded-xl rounded-tl-none self-start max-w-[85%] shadow-sm";
+            }
+            
+            msgDiv.innerHTML = formattedText;
+            chatHistory.appendChild(msgDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+        }
+
+        function addLoadingIndicator() {
+            const chatHistory = document.getElementById('chat-history');
+            const id = 'loading-' + Date.now();
+            const msgDiv = document.createElement('div');
+            msgDiv.id = id;
+            msgDiv.className = "bg-indigo-50 text-indigo-400 p-3 rounded-xl rounded-tl-none self-start w-16 shadow-sm flex items-center justify-center gap-1";
+            msgDiv.innerHTML = '<div class="w-1.5 h-1.5 bg-indigo-400 rounded-full dot-flashing" style="animation-delay: 0s;"></div><div class="w-1.5 h-1.5 bg-indigo-400 rounded-full dot-flashing" style="animation-delay: 0.2s;"></div><div class="w-1.5 h-1.5 bg-indigo-400 rounded-full dot-flashing" style="animation-delay: 0.4s;"></div>';
+            chatHistory.appendChild(msgDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight;
+            return id;
+        }
+
+        function removeElement(id) {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        }
+    </script>
+</body>
+</html>

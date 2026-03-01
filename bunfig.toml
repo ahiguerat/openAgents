@@ -1,3 +1,0 @@
-[install]
-# Hoist shared deps to root node_modules
-hoist = true

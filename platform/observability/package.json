@@ -1,9 +1,0 @@
-{
-  "name": "@openagents/observability",
-  "version": "0.0.1",
-  "private": true,
-  "main": "src/index.ts",
-  "dependencies": {
-    "pino": "^9.6.0"
-  }
-}

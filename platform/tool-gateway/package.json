@@ -1,9 +1,0 @@
-{
-  "name": "@openagents/tool-gateway",
-  "version": "0.0.1",
-  "private": true,
-  "main": "src/index.ts",
-  "dependencies": {
-    "ajv": "^8.17.1"
-  }
-}
