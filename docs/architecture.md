@@ -10,47 +10,54 @@ flowchart TD
     classDef user fill:#e2e8f0,stroke:#64748b,stroke-width:2px,color:#0f172a,font-weight:bold;
     classDef crewai fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#92400e,font-weight:bold;
     classDef transversales fill:#f1f5f9,stroke:#94a3b8,stroke-width:2px,stroke-dasharray: 5 5;
+    classDef spacer fill:transparent,stroke:transparent,color:transparent;
 
     Usuario((👥 Usuario / Sistemas externos)):::user
 
-    subgraph L1 ["1. Capa de Interacción (El Portal)<br/><br/>"]
+    subgraph L1 ["1. Capa de Interacción (El Portal)"]
         direction LR
+        _sp1["　　　　　　　　　　　　　　　　　　　　　　　"]:::spacer
         UI[Chatbots / UIs]
         GenUI[Generative UI]
         API[APIs REST/gRPC]
     end
 
-    subgraph L2 ["2. Capa de Desarrollo (La Fábrica)<br/><br/>"]
+    subgraph L2 ["2. Capa de Desarrollo (La Fábrica)"]
         direction LR
+        _sp2["　　　　　　　　　　　　　　　　　　　　　　　"]:::spacer
         CodeDev["💻 Code-Based<br/>(CrewAI)"]:::crewai
         NoCode["🧩 No-Code/Low-Code"]
         FlowOrch["🔀 Orquestación de Flujos"]
     end
 
-    subgraph L3 ["3. Capa Core (El Corazón de la Ejecución)<br/><br/>"]
+    subgraph L3 ["3. Capa Core (El Corazón de la Ejecución)"]
         direction LR
+        _sp3["　　　　　　　　　　　　　　　　　　　　　　　　　　　　　"]:::spacer
         ExecEngine["⚙️ Execution Engine<br/>(Flows/Tasks de CrewAI)"]:::crewai
         Memoria["🧠 Gestión de Memoria<br/>(Unificada por CrewAI)"]:::crewai
         Sandbox["📦 Code Sandbox"]
         EventBus["📨 Buses de Eventos"]
     end
 
-    subgraph L4 ["4. Capa de Información (El Contexto)<br/><br/>"]
+    subgraph L4 ["4. Capa de Información (El Contexto)"]
         direction LR
+        _sp4["　　　　　　　　　　　　　　　　　　　　　　　"]:::spacer
         RAG["📚 Conocimiento (RAG)"]
         OpsData["📊 Datos (SQL/CRM)"]
         DataLake["🗄️ Analytical Data Lake"]
     end
 
-    subgraph L5 ["5. Capa de Fundación (Inteligencia)<br/><br/>"]
+    subgraph L5 ["5. Capa de Fundación (Inteligencia)"]
         direction LR
+        _sp5["　　　　　　　　　　　　　　　　　　　　　　　"]:::spacer
         Router["🚦 Model Routing"]
         MaaS["🧠 Model-as-a-Service"]
         Cache["⚡ Context Caching"]
     end
 
-    subgraph Transversales ["Capas Transversales (Monitoreo y Validación)<br/><br/>"]
+    subgraph Transversales ["Capas Transversales (Monitoreo y Validación)"]
         direction LR
+        _sp6["　　　　　　　　　　　　　　　　　　　　　　　　　　　　　"]:::spacer
         Obs["👁️ 6. Observabilidad (Monitoring)"]:::transversales
         Trust["🛡️ 7. Trust (Seguridad y Gobernanza)"]:::transversales
     end
