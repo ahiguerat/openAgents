@@ -2,251 +2,228 @@
 
 ## Propósito
 
-La capa Core es el runtime de la plataforma donde agentes razonan y ejecutan acciones. Orquesta el ciclo de vida de tareas, gestiona memoria, aísla ejecución de código, y proporciona canales de comunicación entre componentes. Es el corazón que transforma razonamiento en resultados tangibles.
+La capa Core es el runtime de la plataforma. Aquí los agentes razonan, ejecutan acciones, persisten estado y se comunican. Orquesta el ciclo de vida de tareas, gestiona memoria, aísla ejecución de código, y proporciona canales de comunicación entre componentes.
+
+Es el corazón que transforma definiciones (capa 2) en resultados tangibles.
 
 ## Componentes
 
-### Orchestrator (Agente LLM Supervisor)
-- **Responsabilidad**: Coordinador central impulsado por LLM. Recibe objetivos de usuario, razona sobre descomposición, selecciona agentes, gestiona ciclo de vida de tareas, implementa human-in-the-loop, y aplica políticas operativas.
+### Execution Engine (basado en LangGraph)
+
+- **Responsabilidad**: Ejecutar los grafos de estado que representan agentes y flujos. Gestiona el ciclo cognitivo de cada agente (reason → tool → reason), el checkpointing de estado, y la recuperación ante fallos.
 - **Interfaces expuestas**:
-  - `submit_task(goal, context, constraints)` → task_id
-  - `resume_task(task_id, user_input)` → continúa ejecución
-  - Escucha eventos del Message Bus (tareas completadas, errores, actividades)
-- **Interfaces consumidas**: Agent Runtime, Memory Service, Tool Gateway, Message Bus, API Gateway
-- **Tecnologías candidatas**: Anthropic SDK + OpenRouter, LangChain, LangGraph
+  - `execute(graph, initial_state, config)` → resultado + estado final
+  - `resume(thread_id, new_input)` → continúa ejecución desde checkpoint
+  - Streaming de eventos de ejecución (tool calls, decisiones, resultados parciales)
+- **Interfaces consumidas**: Tool Gateway, Memory Service, LLM Client (capa 5)
+- **Tecnologías**: LangGraph como runtime de grafos de estado
 
-#### Responsabilidades específicas del Orchestrator
-1. **Razonamiento de alto nivel**: ¿Qué agentes necesito invocar? ¿En qué orden? ¿Qué memoria consulto?
-2. **Ciclo de vida**: Transiciones de estado (`pending` → `running` → `completed | failed | blocked`)
-3. **Human-in-the-loop**: Detecta ambigüedad, riesgo, o necesidad de confirmación y pausa (`blocked`) pidiendo input al usuario
-4. **Políticas**: Enforce timeout, reintentos, presupuesto de tokens/costo, permitir/denegar agentes y tools
-5. **Consolidación**: Toma resultados parciales de agentes, decide si es satisfactorio o necesita replaneamiento
-6. **Memoria**: Gestiona scopes de memoria por tarea, decide cuándo activar RAG
+#### El ciclo cognitivo como grafo
 
-#### El loop de razonamiento
-CrewAI + Anthropic SDK usan **tool use nativo** del LLM. No existe un loop manual de "pensar → acción → observación"; el modelo decide:
-- Si tiene suficiente información → responde
-- Si necesita ejecutar tools → pide al API Client que las invoque
-- Si está confuso → responde con pregunta al usuario
+Cada agente se ejecuta como un grafo LangGraph. El patrón base:
 
-El Orchestrator orquesta a nivel de **agentes/tasks**, no a nivel de tool calls individuales.
-
-### Agent Runtime
-- **Responsabilidad**: Ejecuta un agente especializado dentro de su contexto. Construye initial context (task + skills + memoria corta + RAG), expone tools disponibles, gestiona el ciclo nativo de tool use del LLM, maneja errores y timeouts.
-- **Interfaces expuestas**:
-  - `execute(agent, task, context)` → AgentResult
-  - Streaming de tool calls (opcional)
-- **Interfaces consumidas**: Tool Gateway, Memory Service, LLM Client, Message Bus
-- **Tecnologías**: CrewAI Agent execution, Anthropic SDK, custom loop (~30 líneas)
-
-#### Flujo de Agent Runtime
 ```
-1. Recibir (Agent, Task, contexto)
-2. Construir initial_context:
-   - Goal de la tarea
-   - Backstory del agente (rol, especialización)
-   - Skills activas (inyectadas en system prompt)
-   - Memoria corta (últimas acciones, estado)
-   - Contexto RAG (fragmentos relevantes)
-   - Tools disponibles (JSON Schema)
-3. System prompt = [agent role] + [skills] + [tools schema]
-4. Iniciar conversación con LLM
-5. Loop (mientras stop_reason != "end_turn"):
-   a. Enviar messages + tools a LLM
-   b. Si LLM retorna tool_calls:
-      - Validar contra Tool Gateway
-      - Ejecutar cada tool
-      - Append resultados a memoria corta
-      - Continuar loop
-   c. Si LLM retorna texto final → salir
-6. Retornar AgentResult (texto, artifacts, próximas acciones)
+                    ┌──────────────┐
+                    │   reason     │ ← LLM razona sobre qué hacer
+                    └──────┬───────┘
+                           │
+                    ┌──────▼───────┐
+                    │  should_act? │ ← Decisión condicional
+                    └──┬───┬───┬──┘
+                       │   │   │
+              ┌────────┘   │   └────────┐
+              ▼            ▼            ▼
+        ┌──────────┐ ┌──────────┐ ┌──────────┐
+        │exec_tool │ │  human   │ │   END    │
+        └────┬─────┘ │  input   │ └──────────┘
+             │       └──────────┘
+             └──→ reason (loop)
 ```
 
-#### Integración con CrewAI
-En MVP, CrewAI `Agent` + `Task` están presentes pero la ejecución real del loop la maneja el Agent Runtime, usando CrewAI como abstracción de estructura. En fases posteriores, CrewAI puede encapsular el loop completo.
+- **reason**: Nodo que invoca al LLM con el contexto actual (messages, memoria, tools disponibles)
+- **should_act**: Edge condicional — si el LLM pidió ejecutar un tool → `exec_tool`; si necesita input humano → `human_input`; si terminó → `END`
+- **exec_tool**: Ejecuta la herramienta via Tool Gateway, añade resultado al state
+- **human_input**: Persiste estado (checkpoint) y espera input del usuario
+
+El loop `reason → exec_tool → reason` es el **tool use nativo** del LLM. LangGraph gestiona la infraestructura (state, persistencia, streaming); el LLM decide cuándo usar tools y cuándo terminar.
+
+#### Checkpointing y human-in-the-loop
+
+LangGraph persiste el estado del grafo en cada paso (checkpointer). Esto habilita:
+- **Human-in-the-loop**: El grafo pausa en un nodo específico, se persiste el estado, y se reanuda cuando el usuario responde. No hay polling ni estados "blocked" manuales — es nativo.
+- **Recuperación ante fallos**: Si el proceso muere, se retoma desde el último checkpoint.
+- **Ejecuciones de larga duración**: Un flujo puede durar horas o días con pasos intermedios.
+
+#### Orquestación multi-agente
+
+Para flujos con múltiples agentes, el Execution Engine compila el Flow (capa 2) a un **grafo supervisor**:
+
+```
+┌────────────┐     ┌────────────┐     ┌────────────┐
+│  planner   │ ──→ │   coder    │ ──→ │  reviewer  │
+│  (subgrafo)│     │  (subgrafo)│     │  (subgrafo)│
+└────────────┘     └────────────┘     └────────────┘
+```
+
+Cada agente es un subgrafo con su propio ciclo cognitivo. El grafo supervisor coordina la secuencia, pasa resultados entre agentes, y maneja condiciones y errores.
 
 ### Memory Service
-- **Responsabilidad**: Persistencia y recuperación de conocimiento en dos capas: short-term (estado de tarea con TTL) y long-term (persistente entre tareas). Incluye pipeline RAG para enriquecimiento de contexto.
+
+- **Responsabilidad**: Persistencia y recuperación de conocimiento. Diseño propio de la plataforma (no delegado al framework). Dos capas: short-term (estado de tarea con TTL) y long-term (persistente entre tareas). Incluye pipeline RAG para enriquecimiento de contexto.
 - **Interfaces expuestas**:
   - `append(scope, task_id, content)` — Escribir hito en corto plazo
-  - `retrieve(query, agent_role, filters)` — Buscar fragmentos relevantes (RAG)
+  - `retrieve(query, agent_role, filters)` → fragmentos relevantes (RAG)
   - `promote(task_id)` — Seleccionar candidatos de corto a largo plazo
   - `summarize(task_id)` — Resumen de sesión
   - `forget(memory_id)` — Derecho al borrado
-- **Interfaces consumidas**: Agent Runtime, Orchestrator, Vector Store, Persistence DB
-- **Tecnologías**: Redis (short-term), PostgreSQL (long-term), embedding service, vector index
+- **Interfaces consumidas**: Vector Store, Persistence DB, Embedding Service
+- **Tecnologías**: Redis (short-term), PostgreSQL (long-term), pgvector o similar (vector store)
 
-#### Short-term Memory (Redis)
+#### ¿Por qué memoria propia y no la de un framework?
+
+La memoria es un componente crítico de la plataforma que necesita:
+- **Multi-tenancy**: Aislamiento por workspace/proyecto
+- **Gobernanza**: Políticas de retención, derecho al borrado, auditoría
+- **Backends configurables**: Distintos usuarios pueden necesitar distintos stores
+- **Integración transversal**: Observabilidad y Trust necesitan instrumentar la memoria
+
+Frameworks como CrewAI acoplan la memoria a sus propios backends (ChromaDB, SQLite). Para una PaaS, eso es inaceptable.
+
+#### Short-term Memory
+
 - **Scope**: Por `task_id`
 - **TTL**: Automático al cerrar tarea (default 24h)
 - **Contenido**: Hitos de ejecución, tool outputs, decisiones intermedias
-- **Operaciones**: append, read_recent, clear
+- **Operaciones**: `append`, `read_recent`, `clear`
 - **Ejemplo**:
   ```json
   {
     "task_id": "task-123",
-    "scope": "short",
     "entries": [
-      { "timestamp": "2025-03-01T10:00:00Z", "agent": "planner", "action": "read_spec", "result": "spec.md contiene..." },
-      { "timestamp": "2025-03-01T10:00:15Z", "agent": "planner", "action": "create_plan", "result": "5 pasos identificados" }
+      {"timestamp": "...", "agent": "planner", "action": "read_spec", "result": "spec.md contiene..."},
+      {"timestamp": "...", "agent": "planner", "action": "create_plan", "result": "5 pasos identificados"}
     ]
   }
   ```
 
-#### Long-term Memory (PostgreSQL + Vector Store)
-- **Scope**: Persistente entre tareas, por proyecto/workspace
-- **Contenido**: Hechos, patrones, decisiones arquitectónicas, baselines de calidad, preferencias del usuario
-- **Operaciones**: upsert_fact, search (semantic + filters), forget
-- **Estructura**:
-  ```json
-  {
-    "id": "mem-789",
-    "project_id": "proj-456",
-    "agent_role": "coder",
-    "type": "architectural_decision",
-    "content": "Usamos async/await en lugar de callbacks...",
-    "embedding_vector": [...],
-    "created_at": "2025-02-15T09:00:00Z",
-    "tags": ["async", "error-handling"],
-    "ttl": null
-  }
-  ```
+#### Long-term Memory
+
+- **Scope**: Persistente entre tareas, aislada por proyecto/workspace
+- **Contenido**: Hechos, patrones, decisiones arquitectónicas, preferencias del usuario
+- **Operaciones**: `upsert_fact`, `search` (semántico + filtros), `forget`
 
 #### Pipeline RAG
-1. **Ingesta**: Cuando se promociona de corto a largo plazo, normalizar formato, limpiar, segmentar en fragmentos
-2. **Embeddings**: Generar vector para cada fragmento usando embedding model (default: text-embedding-3-small o similar)
-3. **Indexación**: Almacenar en vector store (Pinecone, Weaviate, pgvector)
-4. **Recuperación**: Query semántica + filtros (agent_role, project, date range, tags)
-5. **Post-procesado**: Deduplicación, re-ranking por relevancia, compresión de contexto
-6. **Inyección**: Adjuntar al contexto del Agent Runtime (como "Conocimiento relevante: ...")
 
-#### Fases de implementación de memoria
-- **Fase 1 (MVP)**: Short-term memory in-memory (Map). Sin RAG.
-- **Fase 2**: Short-term en Redis. Long-term en Postgres sin embeddings.
+1. **Ingesta**: Al promover de corto a largo plazo — normalizar, limpiar, segmentar
+2. **Embeddings**: Vector por fragmento (embedding model configurable)
+3. **Indexación**: Vector store con filtros (project, agent_role, tags, fecha)
+4. **Recuperación**: Query semántica + filtros → top-k fragmentos
+5. **Post-procesado**: Deduplicación, re-ranking, compresión de contexto
+6. **Inyección**: Adjuntar al contexto del agente como conocimiento relevante
+
+#### Fases de implementación
+
+- **Fase 1 (MVP)**: Short-term in-memory (Map por task_id). Sin RAG.
+- **Fase 2**: Short-term en Redis. Long-term en PostgreSQL sin embeddings.
 - **Fase 3**: RAG completo con vector store.
-- **Fase 4**: Gobernanza, políticas de retención, auditoría.
+- **Fase 4**: Gobernanza, políticas de retención, auditoría de accesos.
 
 ### Code Sandbox
-- **Responsabilidad**: Ejecutar código de agents y tools en ambiente aislado. Prevenir acceso no autorizado a filesystem, red, y recursos del sistema.
+
+- **Responsabilidad**: Ejecutar código de agentes y tools en ambiente aislado. Prevenir acceso no autorizado a filesystem, red, y recursos del sistema.
 - **Interfaces expuestas**:
-  - `execute_isolated(code, allowed_tools, timeout)` → result | error
-  - Whitelist de capabilities (`fs:read`, `network:external`, `memory:write`)
-- **Interfaces consumidas**: Tool Gateway, Orchestrator (policies)
-- **Tecnologías candidatas**: Docker containers, systemd-run, WebWorkers (Deno), gVisor
+  - `execute_isolated(code, capabilities, timeout)` → resultado | error
+  - Capabilities: `fs:read`, `fs:write`, `network:external`, `memory:write`
+- **Interfaces consumidas**: Tool Gateway, Orchestrator (policies desde capa 7)
+- **Tecnologías candidatas**: Docker, gVisor, Firecracker (microVMs), systemd-nspawn
 
-#### Modelo de Sandbox
-Cada ejecución de agent/tool corre en contexto aislado con:
-- **Permisos mínimos**: Solo capacidades necesarias para esa tarea
-- **Filesystem**: Acceso a directorio temporal `/tmp/task-{task_id}`
-- **Red**: Bloqueado por defecto; permitir solo APIs permitidas (via allowlist)
-- **CPU/Memoria**: Límites de recursos
-- **Timeout**: Máximo tiempo de ejecución
+#### Modelo de aislamiento
 
-#### Decisión de MVP
-En MVP, sandbox es básico:
-- Filesystem: validar paths contra allowlist (no salir del proyecto)
-- Red: bloqueada
-- Timeout: 30s por defecto
-- Sin contenedor real (por simplificar); hardening en Fase 5
+Cada ejecución corre con:
+- **Permisos mínimos**: Solo capabilities necesarias
+- **Filesystem**: Directorio temporal `/tmp/task-{task_id}`, allowlist de paths
+- **Red**: Bloqueada por defecto; allowlist de endpoints
+- **Recursos**: Límites de CPU, memoria, tiempo de ejecución
+- **Sin persistencia**: El sandbox se destruye al completar
 
-### Event Bus (Message Bus)
-- **Responsabilidad**: Comunicación interna asincrónica entre componentes. Soporta pub/sub (eventos de dominio) y request/reply (coordinación puntual).
+#### MVP
+
+Sandbox básico: validación de paths contra allowlist + timeout de 30s. Sin contenedor real. Hardening en fases posteriores.
+
+### Event Bus
+
+- **Responsabilidad**: Comunicación interna asincrónica entre componentes. Pub/sub para eventos de dominio y request/reply para coordinación puntual.
 - **Interfaces expuestas**:
   - `publish(event_type, data)` — Publicar evento
   - `subscribe(event_type, handler)` — Suscribirse
-  - `request(target, message)` → reply — Request/reply sincrónico
-- **Interfaces consumidas**: Todos los componentes (Orchestrator, Agent Runtime, Tool Gateway, Activities, Observability)
-- **Tecnologías candidatas**: In-process (Event Emitter), Redis Pub/Sub, RabbitMQ, Kafka
+  - `request(target, message)` → reply
+- **Interfaces consumidas**: Todos los componentes internos
+- **Tecnologías**: In-process EventEmitter (MVP), Redis Pub/Sub (Fase 2), Kafka (Fase 3)
 
 #### Tipos de eventos
+
 - `task.*` — task.created, task.started, task.blocked, task.completed, task.failed
-- `agent.*` — agent.created, agent.executed, agent.error
+- `agent.*` — agent.started, agent.tool_called, agent.completed, agent.error
 - `tool.*` — tool.invoked, tool.success, tool.failed
 - `memory.*` — memory.appended, memory.promoted, memory.retrieved
-- `activity.*` — activity.triggered, activity.executed
-
-#### Ejemplo: Inter-agent coordination
-```typescript
-// Agent A necesita resultado de Agent B
-await eventBus.request('agent:reviewer', {
-  type: 'review_request',
-  artifact: codeArtifact,
-  criteria: reviewCriteria
-})
-// Agent B escucha, ejecuta revisión, retorna resultado
-```
 
 #### Escalabilidad
-- MVP: In-process Event Emitter (sin persistencia)
-- Fase 2: Redis Pub/Sub para múltiples instancias
-- Fase 3: Kafka para garantías de entrega y replay
+
+- **MVP**: In-process EventEmitter (sin persistencia, sin garantías)
+- **Fase 2**: Redis Pub/Sub para múltiples instancias
+- **Fase 3**: Kafka para garantías de entrega y replay de eventos
 
 ## Decisiones técnicas
 
-### Lenguaje y tecnologías del Core
-- **TypeScript + Bun**: Continuidad con MVP, performance, no config
-- **Anthropic SDK**: Calidad de razonamiento, acceso a todas las capacidades
-- **OpenRouter**: Una sola API key, modelos múltiples, routing automático
+### LangGraph como Execution Engine, no como arquitectura
 
-### Orchestrator como supervisor LLM, no como agente separado
-El Orchestrator **no es un agente distinto**; es una instancia del LLM con rol de supervisor. Resuelve:
-- Razonamiento de alto nivel (qué hacer)
-- No ejecuta tools directamente (delega en agentes)
-- Toma decisiones de control (retry, human-in-the-loop, abort)
+LangGraph resuelve la ejecución de grafos de estado. El Core es más que eso: incluye Memory Service (propio), Code Sandbox (propio), y Event Bus (propio). LangGraph es un componente del Execution Engine, no reemplaza al Core.
 
-### Memory unificada
-Todos los agentes en una tarea comparten el mismo scope de memoria corta. Así:
-- Agent A escribe "encontré dependencia X"
-- Agent B lee eso antes de ejecutar
-- Menos redundancia, más contexto
+### Orchestrator como grafo supervisor
+
+No existe un "Orchestrator" como componente separado con su propio proceso. La orquestación es un grafo LangGraph más — uno que coordina subgrafos (agentes). Ventaja: mismo modelo mental, misma infraestructura de checkpointing, misma observabilidad.
+
+### Checkpointing como fundamento de human-in-the-loop
+
+El patrón de human-in-the-loop no se implementa con estados "blocked" y polling. Se implementa con checkpointing nativo de LangGraph: el grafo pausa, persiste estado, y se reanuda con `resume(thread_id, input)`. Esto es más robusto, más simple, y escala a ejecuciones de larga duración.
 
 ### Tool use nativo del LLM
-No reimplementar el loop; usar el nativo del modelo. Ventajas:
-- Mejor razonamiento del modelo
-- Manejo automático de errores
-- Reflexión del modelo sobre resultados
 
-### Decisión: CrewAI para definición, Custom Runtime para ejecución
-- **CrewAI**: Define estructura (Agent, Task, Crew) — aporta semántica
-- **Custom Agent Runtime**: Ejecuta el loop — control y observabilidad
-- **Orquestación global**: Orchestrator supervisa todo
+El loop cognitivo no es un loop manual. El LLM decide cuándo usar tools y cuándo terminar. LangGraph gestiona la infraestructura alrededor (state, checkpointing, streaming). La plataforma controla qué tools están disponibles, valida I/O, y audita invocaciones.
 
 ## Alcance MVP
 
 **En scope:**
-- Orchestrator básico (razona qué agent invocar)
-- Agent Runtime con loop nativo (~30 líneas)
-- Memory Service short-term in-memory
-- Code Sandbox: validación de paths + timeout
-- Event Bus: in-process Event Emitter
-- Un crew example: general-assistant con skills básicas
-- Task lifecycle: pending → running → completed | failed | blocked
-- Human-in-the-loop: `blocked` state y `resume_task`
-- Logging completo con trace_id
+- Execution Engine con LangGraph: grafo básico (reason → tool → reason → END)
+- Checkpointing para human-in-the-loop (resume desde checkpoint)
+- Memory Service short-term in-memory (Map por task_id)
+- Code Sandbox básico: validación de paths + timeout
+- Event Bus in-process (EventEmitter)
+- Un agente ejemplo: `general-assistant` con tools de filesystem
+- Task lifecycle: created → running → completed | failed (+ pausa via checkpoint)
+- Logging con trace_id y task_id
 
 **Fuera de scope:**
-- Long-term memory persistente
-- RAG
-- Activities y Triggers
-- Inter-agent coordination vía Message Bus (coordinación es serial en MVP)
-- Docker sandbox real
-- Múltiples Orchestrator instances (concurrencia)
-- Persistencia de tareas (en-memory state)
+- Long-term memory y RAG
+- Docker/gVisor sandbox real
+- Event Bus distribuido
+- Orquestación multi-agente (un solo agente en MVP)
+- Streaming de resultados parciales al usuario
+- Activities y Triggers (proactividad)
+- Persistencia de tareas en BD (in-memory state)
 
 ## Preguntas abiertas
 
-1. **¿Concurrencia de tareas?** MVP ejecuta serial (una tarea a la vez). ¿Cuándo paralelizar y cómo gestionar state?
+1. **¿Checkpointer del MVP?** LangGraph necesita un checkpointer. ¿In-memory (MemorySaver) para MVP, o SQLite desde el principio?
 
-2. **¿Timeout del Orchestrator?** Si un agente cuelga, ¿cuánto espera el Orchestrator antes de abortar? Propuesta: 5 minutos por defecto.
+2. **¿Concurrencia de tareas?** MVP ejecuta una tarea a la vez. ¿Cuándo y cómo paralelizar?
 
-3. **¿Reintentos y fallback?** Si un agente falla, ¿reintentar con otro agente? ¿Pasar a fallback plan? Fuera de MVP; Fase 2.
+3. **¿Timeout global?** Si un grafo entra en loop, ¿cuántas iteraciones máximo? Propuesta: 50 iteraciones o 5 minutos, lo que ocurra primero.
 
-4. **¿Composition de agents?** ¿Un agente puede invocar a otro? En MVP, no. Orchestrator es quien orquesta. Fase 2+.
+4. **¿Cómo se detecta un loop infinito?** Límite de iteraciones + detección de tool calls repetitivos con mismo input/output.
 
-5. **¿Streaming de resultados parciales?** Agent Runtime solo retorna resultado final. Streaming de tool calls en Fase 2.
+5. **¿Streaming?** LangGraph soporta streaming de eventos del grafo. ¿Exponemos esto al usuario en MVP o solo logs?
 
-6. **¿Profundidad de memory context?** ¿Cuántos hitos pasado inyectamos? Propuesta: últimos 20 + top-3 por RAG.
+6. **¿Profundidad de memory context?** ¿Cuántos hitos inyectamos al agente? Propuesta: últimos 20 + top-3 por RAG (cuando exista).
 
-7. **¿Quién gestiona el resource cleanup?** Redis, Vector Store, temporal files. Automatizar con TTLs y garbage collection.
-
-8. **¿Cómo se detecta un loop infinito?** Limite de iterations (~50) por task. Tool calls repetitivos en el mismo resultado.
+7. **¿Separación de procesos?** ¿El Execution Engine corre en el mismo proceso que el API Gateway, o en workers separados? MVP: mismo proceso. Fase 2: workers.
