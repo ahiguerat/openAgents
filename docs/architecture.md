@@ -89,10 +89,38 @@ flowchart TD
 
 ## Flujo funcional
 
-1. El **usuario** envía una petición a través de la capa de **Interacción**.
-2. El **Core** activa el flujo diseñado en **Desarrollo** — los agentes razonan, ejecutan herramientas y se coordinan.
-3. Los agentes consultan **Información** para contexto y **Fundación** para razonamiento LLM.
-4. **Observabilidad** y **Trust** auditan y aseguran cada paso del proceso.
+```mermaid
+sequenceDiagram
+    actor U as 👥 Usuario
+    participant L1 as 1. Interacción
+    participant L7 as 7. Trust
+    participant L3 as 3. Core
+    participant L4 as 4. Información
+    participant L5 as 5. Fundación
+    participant L6 as 6. Observabilidad
+
+    Note over L1,L6: La capa 2 (Desarrollo) opera en tiempo de diseño:<br/>define y despliega la lógica que el Core ejecuta.
+
+    U ->>+ L1: Petición
+    L1 ->> L7: Validar identidad y permisos
+    L7 -->> L1: ✓ Autorizado
+
+    L1 ->>+ L3: Activar flujo
+
+    rect rgb(235, 245, 255)
+        Note over L3,L5: Procesamiento agéntico
+        L3 ->> L4: Consultar contexto
+        L4 -->> L3: Contexto
+        L3 ->> L5: Razonamiento y ejecución
+        L5 -->> L3: Resultado
+    end
+
+    L3 -->>- L1: Resultado
+    L1 -->>- U: Respuesta
+
+    L6 --) L3: Trazas, métricas, costes
+    L7 --) L3: Auditoría
+```
 
 ## Documentación detallada
 
