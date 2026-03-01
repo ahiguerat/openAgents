@@ -87,6 +87,14 @@ flowchart TD
     Transversales -.->|Audita/Asegura| L5
 ```
 
+- **1. Interacción (El Portal)**: Punto de entrada al sistema — chatbots, UIs dinámicas, APIs REST/gRPC y canales externos (Slack, email, voz).
+- **2. Desarrollo (La Fábrica)**: Donde se diseñan y construyen los agentes — en código, mediante builder visual (No-Code), o con orquestación declarativa de flujos.
+- **3. Core (El Corazón)**: Runtime de ejecución — motor de agentes, gestión de memoria, sandbox de código aislado y buses de eventos para comunicación interna.
+- **4. Información (El Contexto)**: Provee los datos que los agentes necesitan — conocimiento indexado (RAG), datos operacionales (SQL/CRM) y data lake analítico.
+- **5. Fundación (Inteligencia)**: Abstracción de los LLMs — enrutamiento inteligente de modelos, acceso multi-proveedor (MaaS) y caché de contexto.
+- **6. Observabilidad**: Trazas, métricas de precisión, evaluación de calidad y control de costes (FinOps).
+- **7. Trust (Seguridad y Gobernanza)**: Identidad y permisos (IAM), guardrails de entrada/salida y registro de agentes y herramientas autorizados.
+
 ## Flujo funcional
 
 ```mermaid
