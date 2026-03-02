@@ -27,6 +27,8 @@ TypeScript en todo el proyecto. LangGraph tiene SDK oficial en TypeScript (`@lan
 
 El proyecto se organiza como monorepo con un paquete por capa:
 
+> Nota: esta es la estructura objetivo del MVP. A fecha de 2026-03-02, `develop` todavía no materializa este scaffold en código.
+
 ```
 openagents/
 ├── packages/

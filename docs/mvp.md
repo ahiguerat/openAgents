@@ -67,6 +67,8 @@ Definido en [ADR-002](adr/002-stack-tecnologico-mvp.md). Resumen:
 
 ## Estructura del proyecto
 
+> Nota: esta es la estructura objetivo del MVP. A fecha de 2026-03-02, `develop` todavía no materializa este scaffold en código.
+
 ```
 openagents/
 ├── packages/

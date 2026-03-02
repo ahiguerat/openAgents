@@ -65,7 +65,8 @@ Cualquier contexto relevante.
 
 | ID | Título | Estado | Fecha |
 |----|--------|--------|-------|
-| [001](./001-framework-crewai.md) | Uso de CrewAI como framework de agentes | Propuesto | 2025-03-01 |
+| [001](./001-framework-agentes.md) | Selección de Framework de Agentes — LangGraph | Aceptado | 2026-03-01 |
+| [002](./002-stack-tecnologico-mvp.md) | Stack Tecnológico del MVP | Aceptado | 2026-03-01 |
 
 ## Cómo crear un nuevo ADR
 
@@ -78,7 +79,8 @@ Cualquier contexto relevante.
 ## Lectura recomendada
 
 Para entender decisiones arquitectónicas clave:
-1. [ADR-001](./001-framework-crewai.md) — Elección de CrewAI vs alternativas
-2. Luego consultar [docs/layers/02-development.md](../layers/02-development.md) para detalle de implementación
+1. [ADR-001](./001-framework-agentes.md) — Elección de LangGraph vs alternativas
+2. [ADR-002](./002-stack-tecnologico-mvp.md) — Stack del MVP
+3. Luego consultar [docs/layers/02-development/02-development.md](../layers/02-development/02-development.md) para detalle de implementación
 
 Para historia completa de la plataforma, ver [docs/architecture.md](../architecture.md) (7-layer overview).
