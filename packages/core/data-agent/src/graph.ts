@@ -1,7 +1,8 @@
 import { StateGraph, START, END, Annotation } from "@langchain/langgraph";
 import { z } from "zod";
 import { buildPlannerSystemPrompt } from "./prompts.js";
-import { streamStructuredPlan } from "./llm-flexible.js";
+import { streamStructuredPlan } from "@openagents/shared/llm";
+import { safeJsonParse, deepNullToUndefined } from "@openagents/shared/utils";
 import type { CtiPlan } from "./cti-schema.js";
 import axios from "axios";
 
@@ -16,48 +17,6 @@ const AgentState = Annotation.Root({
   reasoningTokens: Annotation<number | null>,
   error: Annotation<string | null>,
 });
-
-function safeJsonParse(text: string): any {
-  try {
-    return JSON.parse(text);
-  } catch {
-    // Intentar limpiar markdown code blocks
-    let cleaned = text
-      .replace(/^```json\s*/i, "")
-      .replace(/^```\s*/i, "")
-      .replace(/```$/i, "")
-      .trim();
-    
-    try {
-      return JSON.parse(cleaned);
-    } catch {
-      // Buscar JSON object entre texto (Copilot genera explicaciones)
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw new Error("No se pudo extraer JSON válido del texto");
-    }
-  }
-}
-
-function deepNullToUndefined(value: any): any {
-  if (value === null) return undefined;
-
-  if (Array.isArray(value)) {
-    return value.map(deepNullToUndefined);
-  }
-
-  if (typeof value === "object" && value !== null) {
-    return Object.fromEntries(
-      Object.entries(value)
-        .map(([key, val]) => [key, deepNullToUndefined(val)])
-        .filter(([, val]) => val !== undefined)
-    );
-  }
-
-  return value;
-}
 
 const nullToUndefined = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((value) => (value === null ? undefined : value), schema);

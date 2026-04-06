@@ -45,11 +45,11 @@
 
 ## 1. Descripción
 
-El Visualization Agent es un agente especializado en la generación de visualizaciones de datos. Recibe datos estructurados y un prompt en lenguaje natural, y crea gráficos profesionales adaptándose al contexto de los datos. Utiliza **LangGraph** para orquestar un pipeline de 3 etapas y un **LLM** para decidir inteligentemente qué tipo de visualización es más apropiada.
+El Visualization Agent es un agente especializado en la generación de visualizaciones de datos. Recibe datos estructurados y un prompt en lenguaje natural, y crea gráficos profesionales adaptándose al contexto de los datos. Utiliza **LangGraph** para orquestar un pipeline de 3 etapas y **[@openagents/shared](../shared/03-core-shared.md)** para LLM.
 
 ## 2. Arquitectura
 
-El agente utiliza **LangGraph** como orquestador con 3 nodos secuenciales, y aplica los patrones **Strategy** (Chart Generators) y **Factory** (LLM) para desacoplar dependencias externas.
+El agente utiliza **LangGraph** como orquestador con 3 nodos secuenciales, **@openagents/shared** para LLM Factory, y el patrón **Strategy** (Chart Generators).
 
 ### Diagrama de Flujo
 
@@ -405,14 +405,16 @@ interface ChartConfig {
 }
 ```
 
-### 3.7. LLM Abstraction 
+### 3.7. LLM Abstraction (desde `@openagents/shared`)
 
-Capa de abstracción para proveedores LLM usando **Factory Pattern**(`src/llm-flexible.ts`).
+El Visualization Agent utiliza **[@openagents/shared](../shared/03-core-shared.md)** para abstracciones LLM compartidas.
 
-**LLMFactory:**
-- Singleton para gestión centralizada
-- Crea provider según configuración de entorno
-- Soporta Copilot SDK y OpenRouter
+**Importado de shared:**
+
+```typescript
+import { streamStructuredPlan } from '@openagents/shared/llm';
+import { safeJsonParse } from '@openagents/shared/utils';
+```
 
 **Configuración:**
 
@@ -421,28 +423,18 @@ LLM_PROVIDER=copilot|openrouter
 COPILOT_MODEL=claude-sonnet-4.5
 OPENROUTER_API_KEY=sk-or-v1-...
 OPENROUTER_MODEL=nvidia/nemotron-3-nano-30b-a3b:free
-
-COPILOT_MODEL=claude-sonnet-4.5  # Opcional
-OPENROUTER_API_KEY=sk-or-v1-...  # Si provider=openrouter
-OPENROUTER_MODEL=...              # Opcional
 ```
 
-**Función helper:**
-
-```typescript
-streamStructuredPlan({
-  systemPrompt: string,
-  userPrompt: string
-}): Promise<{ rawText: string }>
-```
+**Ver documentación completa**: [03-core-shared.md](../shared/03-core-shared.md)
 
 ### 3.8. LLM Provider
 
-**Interfaz abstracta (`src/llm-provider.ts`):**
+**Interfaz abstracta:** Ver [@openagents/shared](../shared/03-core-shared.md) para detalles completos.
+
 ```typescript
 interface LLMProvider {
   initialize(): Promise<void>;
-  stream(prompt: string): AsyncIterable<string>;
+  streamStructuredPlan(args: StreamArgs): Promise<StreamResponse>;
   dispose?(): Promise<void>;
 }
 ```
@@ -944,9 +936,7 @@ await vizAgentClient.createVisualization(
   prompt, 
   data, 
   'plotly'  // chartProvider
-);
-```
-}
+  );
 ```
 
 2. Opcional: Exponer como tool separado en MCP server si se necesita acceso directo

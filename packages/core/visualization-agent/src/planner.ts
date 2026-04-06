@@ -1,29 +1,6 @@
-import { streamStructuredPlan } from './llm-flexible.js';
+import { streamStructuredPlan } from '@openagents/shared/llm';
+import { safeJsonParse } from '@openagents/shared/utils';
 import { VisualizationRequest, VisualizationPlan } from './types.js';
-
-function safeJsonParse(text: string): any {
-  try {
-    return JSON.parse(text);
-  } catch {
-    // Intentar limpiar markdown code blocks
-    let cleaned = text
-      .replace(/^```json\s*/i, "")
-      .replace(/^```\s*/i, "")
-      .replace(/```$/i, "")
-      .trim();
-    
-    try {
-      return JSON.parse(cleaned);
-    } catch {
-      // Buscar JSON object entre texto (Copilot genera explicaciones)
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
-      }
-      throw new Error("No se pudo extraer JSON válido del texto");
-    }
-  }
-}
 
 export async function planVisualization(request: VisualizationRequest): Promise<VisualizationPlan> {
   console.error('[VIZ_AGENT][PLANNER] Starting visualization planning');

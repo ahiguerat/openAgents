@@ -1,9 +1,9 @@
 import { StateGraph, START, END, Annotation } from "@langchain/langgraph";
 import { buildPlannerPrompt } from "./prompts.js";
-import { streamStructuredPlan } from "./llm-flexible.js";
+import { streamStructuredPlan } from "@openagents/shared/llm";
 import { DataAgentMCPClient } from "./clients/data-agent-mcp-client.js";
 import { VizAgentMCPClient } from "./clients/viz-agent-mcp-client.js";
-import { safeJsonParse } from "./utils.js";
+import { safeJsonParse } from "@openagents/shared/utils";
 import type { OrchestratorPlan, DataAgentResponse } from "./types.js";
 import * as path from "path";
 import * as fs from "fs";

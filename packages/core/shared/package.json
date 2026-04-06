@@ -1,0 +1,31 @@
+{
+  "name": "@openagents/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared utilities and providers for OpenAgents",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./llm": "./dist/llm/index.js",
+    "./utils": "./dist/utils/index.js",
+    "./mcp": "./dist/mcp/index.js",
+    "./config": "./dist/config/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "^0.2.0",
+    "@langchain/core": "^1.1.36",
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "openai": "^6.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "typescript": "^5.7.2"
+  }
+}

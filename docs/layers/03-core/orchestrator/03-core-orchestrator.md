@@ -32,11 +32,11 @@
 
 El Orchestrator es el agente coordinador central del sistema OpenAgents. Actúa como **hub inteligente** que recibe solicitudes en lenguaje natural, las interpreta usando un LLM, y coordina múltiples agentes especializados (data-agent, visualization-agent) para cumplir con la petición del usuario.
 
-Implementa el **patrón Hub-and-Spoke** donde los agentes especializados nunca se comunican directamente entre ellos, solo con el orchestrator. Utiliza Model Context Protocol (MCP) para la comunicación entre agentes.
+Implementa el **patrón Hub-and-Spoke** donde los agentes especializados nunca se comunican directamente entre ellos, solo con el orchestrator. Utiliza **[@openagents/shared](../shared/03-core-shared.md)** para abstracciones LLM compartidas y Model Context Protocol (MCP) para la comunicación entre agentes.
 
 ## 2. Arquitectura
 
-El orchestrator utiliza **LangGraph** como orquestador con 4 nodos secuenciales, y aplica los patrones **Hub-and-Spoke** (coordinación de agentes) y **Factory** (LLM abstraction).
+El orchestrator utiliza **LangGraph** como orquestador con 4 nodos secuenciales, **@openagents/shared** para LLM Factory, y el patrón **Hub-and-Spoke** para coordinación de agentes.
 
 ### Diagrama de Flujo
 
@@ -130,77 +130,6 @@ graph TB
 - **Planner**: Analiza intención del usuario con LLM
 - **MCP Clients**: Conectores para spawning de agentes especializados via stdio
 - **Spokes**: Agentes especializados (Data, Viz) que operan independientemente
-            
-            LLM_FACTORY --> LLM_INTERFACE
-            LLM_INTERFACE -.-> COPILOT
-            LLM_INTERFACE -.-> OPENROUTER
-        end
-        
-        subgraph MCP_LAYER["MCP Clients Layer (Hub-and-Spoke)"]
-            direction LR
-            
-            subgraph DATA_CLIENT_BOX["Data Client"]
-                DATA_CLIENT["DataAgentMCPClient<br/>━━━━━━━<br/>stdio transport<br/>timeout: 5min"]
-            end
-            
-            subgraph VIZ_CLIENT_BOX["Viz Client"]
-                VIZ_CLIENT["VizAgentMCPClient<br/>━━━━━━━<br/>stdio transport<br/>timeout: 2min"]
-            end
-        end
-        
-        PROMPTS["Prompt System<br/>Templates<br/>Agent Capabilities"]
-        TYPES["Type Definitions<br/>OrchestratorPlan<br/>State"]
-        UTILS["Utils<br/>JSON Parsing<br/>Formatters"]
-    end
-    
-    subgraph Spokes["Specialized Agents (Spokes)"]
-        direction LR
-        DATA_AGENT["Data Agent<br/>════════════<br/>MCP Server<br/>Tool: query_cti_measurements<br/>Provider: CTI/Postgres/Mongo"]
-        VIZ_AGENT["Viz Agent<br/>════════════<br/>MCP Server<br/>Tool: create_visualization<br/>Provider: QuickChart/Plotly"]
-    end
-    
-    CLIENT ==>|"1. MCP Request"| MCP_SERVER
-    MCP_SERVER ==>|"2. Invoke"| LANGGRAPH
-    
-    LANGGRAPH <-->|"3. Planner uses"| LLM_FACTORY
-    COPILOT -->|"4. API Call"| LLM_EXT
-    OPENROUTER -->|"4. API Call"| LLM_EXT
-    
-    LANGGRAPH <-->|"5. Fetcher spawns"| DATA_CLIENT
-    DATA_CLIENT -.->|"MCP stdio"| DATA_AGENT
-    DATA_AGENT -.->|"Response"| DATA_CLIENT
-    
-    LANGGRAPH <-->|"6. Visualizer spawns"| VIZ_CLIENT
-    VIZ_CLIENT -.->|"MCP stdio"| VIZ_AGENT
-    VIZ_AGENT -.->|"Response"| VIZ_CLIENT
-    
-    LANGGRAPH -->|"7. Uses"| PROMPTS
-    LANGGRAPH -->|"8. Uses"| TYPES
-    LANGGRAPH -->|"9. Uses"| UTILS
-    
-    LANGGRAPH ==>|"10. Response"| MCP_SERVER
-    MCP_SERVER ==>|"11. MCP Response"| CLIENT
-    
-    classDef entry fill:#4A90E2,stroke:#2E5C8A,stroke-width:3px,color:#fff,font-weight:bold
-    classDef orchestrator fill:#50C878,stroke:#2D7A4A,stroke-width:3px,color:#fff,font-weight:bold
-    classDef factory fill:#9B59B6,stroke:#6C3A82,stroke-width:3px,color:#fff,font-weight:bold
-    classDef interface fill:#E8E8E8,stroke:#666,stroke-width:2px,color:#333
-    classDef provider fill:#F0F0F0,stroke:#999,stroke-width:2px,color:#333
-    classDef client fill:#FF6B6B,stroke:#C44545,stroke-width:3px,color:#fff,font-weight:bold
-    classDef agent fill:#FFD700,stroke:#B8860B,stroke-width:4px,color:#333,font-weight:bold
-    classDef util fill:#FFB6C1,stroke:#FF69B4,stroke-width:2px,color:#333
-    classDef external fill:#FFA500,stroke:#CC8400,stroke-width:3px,color:#fff,font-weight:bold
-    
-    class MCP_SERVER entry
-    class LANGGRAPH orchestrator
-    class LLM_FACTORY factory
-    class LLM_INTERFACE interface
-    class COPILOT,OPENROUTER provider
-    class DATA_CLIENT,VIZ_CLIENT client
-    class DATA_AGENT,VIZ_AGENT agent
-    class PROMPTS,TYPES,UTILS util
-    class CLIENT,LLM_EXT external
-```
 
 ### Patrones de Diseño Aplicados
 
@@ -321,14 +250,16 @@ async createVisualization(prompt: string, data: any[], outputDir?: string): Prom
 async close(): Promise<void>
 ```
 
-### 3.5. LLM Abstraction (`src/llm-flexible.ts`)
+### 3.5. LLM Abstraction (desde `@openagents/shared`)
 
-Capa de abstracción para proveedores LLM usando **Factory Pattern**.
+El Orchestrator utiliza **[@openagents/shared](../shared/03-core-shared.md)** para abstracciones LLM compartidas.
 
-**LLMFactory:**
-- Singleton para gestión centralizada
-- Crea provider según configuración de entorno
-- Soporta Copilot SDK y OpenRouter
+**Importado de shared:**
+
+```typescript
+import { streamStructuredPlan } from "@openagents/shared/llm";
+import { safeJsonParse } from "@openagents/shared/utils";
+```
 
 **Configuración:**
 ```env
@@ -337,6 +268,8 @@ COPILOT_MODEL=claude-sonnet-4.5
 OPENROUTER_API_KEY=sk-or-v1-...
 OPENROUTER_MODEL=nvidia/nemotron-3-nano-30b-a3b:free
 ```
+
+**Ver documentación completa**: [03-core-shared.md](../shared/03-core-shared.md)
 
 ### 3.6. Types (`src/types.ts`)
 

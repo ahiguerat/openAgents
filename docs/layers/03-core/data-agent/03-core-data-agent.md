@@ -31,11 +31,11 @@
 
 El Data Agent es un agente especializado en la obtención de datos de mediciones eléctricas. Actúa como interfaz inteligente entre solicitudes en lenguaje natural y consultas estructuradas a diversos proveedores de datos, utilizando un LLM para interpretar las peticiones y generar las llamadas apropiadas.
 
-Implementa el **patrón Strategy** para desacoplar la obtención de datos de la fuente específica, permitiendo conectarse fácilmente a diferentes sistemas (CTI API, PostgreSQL, MongoDB, etc.).
+Implementa el **patrón Strategy** (Data Providers) y utiliza **[@openagents/shared](../shared/03-core-shared.md)** para abstracciones LLM compartidas.
 
 ## 2. Arquitectura
 
-El agente utiliza **LangGraph** como orquestador y aplica los patrones **Strategy** (Data Providers) y **Factory** (LLM) para desacoplar dependencias externas.
+El agente utiliza **LangGraph** como orquestador y **@openagents/shared** para LLM Factory centralizado, garantizando consistencia con otros agentes.
 
 ### Diagrama de Flujo
 
@@ -265,7 +265,24 @@ Define y valida (`src/cti-schema.ts`):
 - Sensor types válidos
 - Estructura del plan de consulta
 
-### 3.7. LLM Abstraction (`src/llm-flexible.ts`)
+### 3.7. LLM Abstraction (desde `@openagents/shared`)
+
+El Data Agent utiliza el paquete compartido **[@openagents/shared](../shared/03-core-shared.md)** para abstracciones LLM, garantizando consistencia con otros agentes del sistema.
+
+**Importado de shared:**
+
+```typescript
+import { streamStructuredPlan } from "@openagents/shared/llm";
+import { safeJsonParse, deepNullToUndefined } from "@openagents/shared/utils";
+```
+
+**Funcionalidades:**
+
+- **LLM Factory**: Gestión centralizada de proveedores LLM (OpenRouter, Copilot)
+- **Provider abstraction**: Interfaz común para diferentes LLMs
+- **Utilities**: Parsing JSON robusto, normalización de datos
+
+**Ver documentación completa**: [03-core-shared.md](../shared/03-core-shared.md)
 
 Capa de abstracción para providers LLM:
 - Soporta GitHub Copilot SDK

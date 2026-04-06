@@ -36,76 +36,56 @@ El sistema OpenAgents es una arquitectura multi-agente donde cada agente:
 - **Usa LangGraph** para orquestar su flujo interno
 
 ```mermaid
-graph TB
-
-  subgraph Cliente
-        User[Usuario/IDE/CLI]
-    end
-
-    subgraph Orchestrator["ORCHESTRATOR (MCP Server)"]
+graph LR
+    User[Usuario/IDE]
+    
+    subgraph Orchestrator["Orchestrator Hub"]
         OrchestratorMCP[MCP Server]
-        OrchestratorGraph[LangGraph Pipeline]
-        Planner[Planner Node<br/>LLM]
-        DataFetcher[Data Fetcher Node]
-        Visualizer[Visualizer Node]
-        Formatter[Formatter Node]
-        
-        OrchestratorMCP --> OrchestratorGraph
-        OrchestratorGraph --> Planner
-        Planner --> DataFetcher
-        DataFetcher --> Visualizer
-        Visualizer --> Formatter
+        OrchestratorGraph[LangGraph]
     end
     
-    subgraph VizAgent["VISUALIZATION AGENT (MCP Server)"]
+    subgraph DataAgent["Data Agent"]
+        DataMCP[MCP Server]
+        DataGraph[LangGraph]
+    end
+    
+    subgraph VizAgent["Viz Agent"]
         VizMCP[MCP Server]
-        VizGraph[LangGraph Pipeline]
-        VizPlanner[Planner Node<br/>LLM]
-        Generator[Generator Node]
-        Saver[Saver Node]
-        Factory[Chart Factory]
-        QuickChart[QuickChart Provider]
-        
-        VizMCP --> VizGraph
-        VizGraph --> VizPlanner
-        VizPlanner --> Generator
-        Generator --> Factory
-        Factory --> QuickChart
-        Generator --> Saver
+        VizGraph[LangGraph]
+    end
+    
+    subgraph Shared["@openagents/shared"]
+        LLM[LLM Factory]
+        Utils[Utilities]
     end
     
     subgraph External["External APIs"]
-        CTIAPI[(CTI API<br/>HTTP)]
-        QuickChartAPI[(QuickChart API<br/>HTTP)]
+        CTIAPI[CTI API]
+        QuickChartAPI[QuickChart API]
     end
-
-    subgraph DataAgent["DATA AGENT (MCP Server)"]
-        DataMCP[MCP Server]
-        DataGraph[LangGraph Pipeline]
-        DataPlanner[Planner Node<br/>LLM]
-        Fetcher[Fetcher Node]
-        Parser[Parser Node]
-        
-        DataMCP --> DataGraph
-        DataGraph --> DataPlanner
-        DataPlanner --> Fetcher
-        Fetcher --> Parser
-    end
-
-    Visualizer -.->|"MCP Client<br/>create_visualization"| VizMCP
-    User -->|"MCP: process_user_request"| OrchestratorMCP
-    DataFetcher -.->|"MCP Client<br/>query_cti_measurements"| DataMCP
     
+    User -->|MCP request| OrchestratorMCP
+    OrchestratorMCP --> OrchestratorGraph
     
-    QuickChart -->|HTTP GET| QuickChartAPI
-    Fetcher -->|HTTP GET| CTIAPI
+    OrchestratorGraph -.->|spawns MCP client| DataMCP
+    OrchestratorGraph -.->|spawns MCP client| VizMCP
     
-    style User fill:#e1f5ff
-    style OrchestratorMCP fill:#fff9c4
-    style DataMCP fill:#c8e6c9
-    style VizMCP fill:#f8bbd0
-    style CTIAPI fill:#ffe0b2
-    style QuickChartAPI fill:#ffe0b2
+    DataMCP --> DataGraph
+    VizMCP --> VizGraph
+    
+    OrchestratorGraph -->|uses| Shared
+    DataGraph -->|uses| Shared
+    VizGraph -->|uses| Shared
+    
+    DataGraph -->|HTTP| CTIAPI
+    VizGraph -->|HTTP| QuickChartAPI
+    
+    style User fill:#e1f5ff,stroke:#0288d1,stroke-width:2px
+    style Orchestrator fill:#fff9c4,stroke:#fbc02d,stroke-width:3px
+    style DataAgent fill:#c8e6c9,stroke:#66bb6a,stroke-width:2px
+    style VizAgent fill:#f8bbd0,stroke:#ec407a,stroke-width:2px
+    style Shared fill:#e8e8e8,stroke:#999,stroke-width:3px
+    style External fill:#ffe0b2,stroke:#ff9800,stroke-width:2px
 ```
 ---
 
@@ -116,23 +96,31 @@ graph TB
 El sistema implementa una **arquitectura hub-and-spoke** donde el Orchestrator actúa como hub central, coordinando agentes especializados (spokes):
 
 ```mermaid
-graph TD
-    Client["Cliente Externo<br/>(Copilot/CLI)"]
-    Orchestrator["ORCHESTRATOR<br/>(Hub Central)"]
-    DataAgent["DATA AGENT<br/>(Spoke)"]
-    VizAgent["VIZ AGENT<br/>(Spoke)"]
-    API["API CTI"]
+graph LR
+    Client[Cliente<br/>Copilot/CLI]
+    Orchestrator[Orchestrator<br/>Hub Central]
+    DataAgent[Data Agent<br/>Spoke]
+    VizAgent[Viz Agent<br/>Spoke]
+    Shared[@openagents/shared<br/>LLM + Utils]
     
-    Client -->|Protocolo MCP<br/>stdio| Orchestrator
-    Orchestrator -->|Cliente MCP<br/>spawn| DataAgent
-    Orchestrator -->|Cliente MCP<br/>spawn| VizAgent
-    DataAgent --> API
+    Client -->|MCP stdio| Orchestrator
+    Orchestrator -.->|spawns| DataAgent
+    Orchestrator -.->|spawns| VizAgent
     
-    style Client fill:#e1f5ff
-    style Orchestrator fill:#fff4e6
-    style DataAgent fill:#e8f5e9
-    style VizAgent fill:#f3e5f5
-    style API fill:#fce4ec
+    Orchestrator -->|uses| Shared
+    DataAgent -->|uses| Shared
+    VizAgent -->|uses| Shared
+    
+    DataAgent -.->|HTTP| API[CTI API]
+    VizAgent -.->|HTTP| Charts[QuickChart API]
+    
+    style Client fill:#e1f5ff,stroke:#0288d1,stroke-width:2px
+    style Orchestrator fill:#fff4e6,stroke:#fb8c00,stroke-width:3px
+    style DataAgent fill:#e8f5e9,stroke:#66bb6a,stroke-width:2px
+    style VizAgent fill:#f3e5f5,stroke:#ab47bc,stroke-width:2px
+    style Shared fill:#e8e8e8,stroke:#999,stroke-width:3px
+    style API fill:#fce4ec,stroke:#ec407a,stroke-width:2px
+    style Charts fill:#fce4ec,stroke:#ec407a,stroke-width:2px
 ```
 
 **Principios clave:**
@@ -140,8 +128,23 @@ graph TD
 2. **Aislamiento de Agentes**: Cada agente opera de forma independiente
 3. **Protocolo Estándar**: Toda comunicación usa MCP (JSON-RPC sobre stdio)
 4. **Spawning Dinámico**: El orchestrator inicia agentes bajo demanda
+5. **Código Compartido**: Todos los agentes usan [@openagents/shared](./shared/03-core-shared.md) para LLM y utilidades
 
 ### 2.2. Agentes del Sistema
+
+#### Shared Package [@openagents/shared](./shared/03-core-shared.md)
+
+**Rol**: Biblioteca compartida que centraliza código común entre agentes.
+
+**Responsabilidades:**
+- Abstracción de proveedores LLM (OpenRouter, Copilot)
+- Utilidades comunes (JSON parsing, normalización de datos)
+- Factory patterns para instanciación de proveedores
+
+**Beneficios:**
+- ✅ Eliminación de ~800 líneas de código duplicado
+- ✅ Mantenimiento centralizado
+- ✅ Consistencia entre agentes
 
 #### Orchestrator (Hub Central)
 
