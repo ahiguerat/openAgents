@@ -34,7 +34,7 @@ al usuario de forma trazable.
 
 ## 3. Dentro / fuera del MVP
 
-### ✅ Dentro
+### Dentro
 - Orchestrator LLM que razona y crea un agente
 - Agent Runtime con loop de tool use nativo
 - Tool Gateway con `filesystem.read` y `filesystem.write`
@@ -44,7 +44,7 @@ al usuario de forma trazable.
 - Logging estructurado con `task_id` + `trace_id`
 - Estado de tareas en memoria (in-process)
 
-### ❌ Fuera (post-MVP)
+### Fuera (post-MVP)
 - Message Bus real (inter-agente)
 - Memory Service (short/long-term)
 - RAG

@@ -1,0 +1,122 @@
+# ========================================
+# OpenAgents Repository - .gitignore
+# ========================================
+
+#Doc open API
+openapi/
+packages/core/orchestrator/output/
+
+# Dependencias
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+out/
+
+# Variables de entorno (IMPORTANTE: contiene API keys y credenciales)
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# IDE / Editores
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+
+# Sistema operativo
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
+# Temporales
+*.tmp
+*.temp
+.cache/
+.parcel-cache/
+
+# Archivos de depuración
+*.dump
+*.stackdump
+*.pid
+*.seed
+*.pid.lock
+
+# Certificados y claves privadas
+*.pem
+*.key
+*.cert
+*.crt
+*.p12
+*.pfx
+
+# Backup files
+*.bak
+*.backup
+*~
+
+# Runtime data
+pids/
+*.pid
+*.seed
+
+# TypeScript
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
+*.tgz
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# Yarn
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+.pnp.*

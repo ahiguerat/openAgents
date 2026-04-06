@@ -1,0 +1,33 @@
+{
+  "name": "orchestrator",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Orchestrator agent that coordinates data-agent and visualization-agent",
+  "keywords": [
+    "orchestrator",
+    "ai-agent",
+    "langgraph"
+  ],
+  "scripts": {
+    "dev": "tsx src/mcp-server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/mcp-server.js",
+    "mcp": "node dist/mcp-server.js",
+    "interactive": "tsx scripts/interactive.ts"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "^0.2.0",
+    "@langchain/core": "^0.3.40",
+    "@langchain/langgraph": "^0.2.74",
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "dotenv": "^16.4.5",
+    "openai": "^6.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

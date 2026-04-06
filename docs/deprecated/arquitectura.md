@@ -190,8 +190,8 @@ Técnica donde el agente recupera contexto relevante desde memoria antes de gene
 ```mermaid
 graph TB
     subgraph Entrada[" Entrada al sistema "]
-        U([👤 Usuario]) -->|request| GW[API Gateway]
-        TRIG([⚡ Trigger\ncron · webhook · condition]) --> ACT[Activity]
+        U([Usuario]) -->|request| GW[API Gateway]
+        TRIG([Trigger\ncron · webhook · condition]) --> ACT[Activity]
     end
 
     GW -->|Task| ORC[Orchestrator]

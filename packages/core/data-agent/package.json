@@ -1,0 +1,38 @@
+{
+  "name": "data-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "GitHub Copilot Extension for CTI electrical data measurements",
+  "keywords": [
+    "github-copilot",
+    "mcp",
+    "cti",
+    "electrical-data",
+    "ai-agent"
+  ],
+  "scripts": {
+    "dev": "tsx src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "mcp": "tsx src/mcp-server.ts",
+    "mcp:prod": "node dist/mcp-server.js",
+    "test:mcp": "node scripts/test-mcp.js test",
+    "check": "node scripts/test-mcp.js check"
+  },
+  "dependencies": {
+    "@github/copilot-sdk": "^0.2.0",
+    "@langchain/core": "^1.1.36",
+    "@langchain/langgraph": "^0.2.74",
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "axios": "^1.13.6",
+    "dotenv": "^16.4.5",
+    "openai": "^6.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
