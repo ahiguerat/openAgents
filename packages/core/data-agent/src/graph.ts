@@ -7,6 +7,7 @@ import axios from "axios";
 
 const AgentState = Annotation.Root({
   userPrompt: Annotation<string>,
+  dataProvider: Annotation<string>,
   rawModelOutput: Annotation<string>,
   parsedPlan: Annotation<CtiPlan | null>,
   finalUrl: Annotation<string | null>,

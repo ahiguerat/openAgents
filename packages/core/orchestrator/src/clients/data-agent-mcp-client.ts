@@ -53,15 +53,16 @@ export class DataAgentMCPClient {
   }
 
   /**
-   * Consultar mediciones CTI
+   * Consultar mediciones usando un data provider específico
    */
-  async queryMeasurements(query: string): Promise<any> {
+  async queryMeasurements(query: string, dataProvider?: string): Promise<any> {
     if (!this.client) {
       throw new Error("MCP client not connected. Call connect() first.");
     }
 
     console.error(`[ORCHESTRATOR][MCP-CLIENT] Calling data-agent tool: query_cti_measurements`);
     console.error(`[ORCHESTRATOR][MCP-CLIENT] Query: ${query}`);
+    console.error(`[ORCHESTRATOR][MCP-CLIENT] Provider: ${dataProvider || 'cti (default)'}`);
 
     try {
       // Crear timeout personalizado de 5 minutos para consultas largas a la API
@@ -73,6 +74,7 @@ export class DataAgentMCPClient {
         name: "query_cti_measurements",
         arguments: {
           query,
+          ...(dataProvider && { dataProvider }),
         },
       });
 

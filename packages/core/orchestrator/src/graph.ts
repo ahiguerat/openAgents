@@ -106,6 +106,10 @@ const dataFetcherNode = async (state: typeof OrchestratorState.State) => {
     console.error("\n[ORCHESTRATOR][DATA-FETCHER] Initiating data fetch via MCP");
     console.error(`[ORCHESTRATOR][DATA-FETCHER] PROMPT_TO_DATA_AGENT: ${plan.dataAgentPrompt}`);
     
+    // Detectar data provider del prompt
+    const dataProvider = detectDataProvider(state.userPrompt) || 'cti';
+    console.error(`[ORCHESTRATOR][DATA-FETCHER] Data provider: ${dataProvider}`);
+    
     // Conectar al data-agent si no está conectado
     if (!mcpClient) {
       const dataAgentPath = process.env.DATA_AGENT_MCP_PATH;
@@ -113,8 +117,8 @@ const dataFetcherNode = async (state: typeof OrchestratorState.State) => {
       await mcpClient.connect();
     }
     
-    // Llamar al data-agent
-    const rawData = await mcpClient.queryMeasurements(plan.dataAgentPrompt);
+    // Llamar al data-agent con el provider
+    const rawData = await mcpClient.queryMeasurements(plan.dataAgentPrompt, dataProvider);
     
     console.error("[ORCHESTRATOR][DATA-FETCHER] DATA_RECEIVED from data-agent");
     console.error(`[ORCHESTRATOR][DATA-FETCHER] Response size: ${JSON.stringify(rawData).length} bytes`);
@@ -201,6 +205,10 @@ const visualizerNode = async (state: typeof OrchestratorState.State) => {
   let vizMcpClient: VizAgentMCPClient | null = null;
 
   try {
+    // Detectar chartProvider del prompt del usuario (si se especifica)
+    const chartProvider = detectChartProvider(userPrompt) || 'quickchart';
+    console.error(`[ORCHESTRATOR][VISUALIZER] Using chart provider: ${chartProvider}`);
+    
     // Detectar si hay múltiples campos en los datos
     const firstDataPoint = dataAgentResponse.data[0];
     const numericFields = firstDataPoint ? Object.keys(firstDataPoint).filter(key => 
@@ -231,11 +239,12 @@ Create an appropriate chart that clearly shows the data trends.`;
     vizMcpClient = new VizAgentMCPClient(vizAgentPath);
     await vizMcpClient.connect();
 
-    // Llamar al viz-agent
+    // Llamar al viz-agent con chartProvider
     const vizResponse = await vizMcpClient.createVisualization(
       vizPrompt,
       dataAgentResponse.data,
-      plan.visualizationType || "line_chart"
+      plan.visualizationType || "line_chart",
+      chartProvider
     );
 
     console.error("[ORCHESTRATOR][VISUALIZER] VISUALIZATION_RECEIVED:");
@@ -296,6 +305,10 @@ const reportGeneratorNode = async (state: typeof OrchestratorState.State) => {
   const visualizations: string[] = [];
   
   try {
+    // Detectar chartProvider del prompt del usuario (si se especifica)
+    const chartProvider = detectChartProvider(userPrompt) || 'quickchart';
+    console.error(`[ORCHESTRATOR][REPORT-GEN] Using chart provider: ${chartProvider}`);
+    
     // Crear carpeta del informe con timestamp
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
     const reportFolderName = `report_${timestamp}`;
@@ -354,11 +367,12 @@ Total records: ${recordCount}
 
 Create an appropriate ${chartDef.type} that clearly shows the data.`;
 
-        // Llamar al viz-agent para esta visualización
+        // Llamar al viz-agent para esta visualización con chartProvider
         const vizResponse = await vizMcpClient.createVisualization(
           vizPrompt,
           dataAgentResponse.data,
-          chartDef.type
+          chartDef.type,
+          chartProvider
         );
 
         if (vizResponse?.success && vizResponse.imagePath) {
@@ -589,4 +603,58 @@ export function buildGraph() {
     .addEdge("visualizer", "formatter")
     .addEdge("formatter", END)
     .compile();
+}
+
+/**
+ * Helper function: Detect chart provider from user prompt
+ * Busca palabras clave en el prompt que indiquen un proveedor específico
+ * Si no se encuentra ninguno, retorna null (se usará quickchart por defecto)
+ */
+/**
+ * Detecta si el usuario especifica un proveedor de datos en el prompt
+ * Retorna null si no se detecta ninguno (default será "cti")
+ */
+function detectDataProvider(prompt: string): string | null {
+  const lowerPrompt = prompt.toLowerCase();
+  
+  // Buscar keywords de data providers
+  if (lowerPrompt.includes("postgres") || lowerPrompt.includes("postgresql")) {
+    return "postgres";
+  }
+  if (lowerPrompt.includes("mongodb") || lowerPrompt.includes("mongo")) {
+    return "mongodb";
+  }
+  if (lowerPrompt.includes("mysql")) {
+    return "mysql";
+  }
+  if (lowerPrompt.includes("cti") || lowerPrompt.includes("ormazabal")) {
+    return "cti";
+  }
+  
+  // No se especificó provider, usar default
+  return null;
+}
+
+/**
+ * Detecta si el usuario especifica un proveedor de gráficas en el prompt
+ * Retorna null si no se detecta ninguno (default será "quickchart")
+ */
+function detectChartProvider(prompt: string): string | null {
+  const lowerPrompt = prompt.toLowerCase();
+  
+  // Buscar menciones explícitas de proveedores
+  if (lowerPrompt.includes('quickchart')) {
+    return 'quickchart';
+  }
+  
+  if (lowerPrompt.includes('chartjs') || lowerPrompt.includes('chart.js')) {
+    return 'chartjs';
+  }
+  
+  if (lowerPrompt.includes('plotly')) {
+    return 'plotly';
+  }
+  
+  // Si no se especifica proveedor, retornar null (se usará el por defecto)
+  return null;
 }

@@ -87,10 +87,15 @@ const generatorNode = async (state: typeof VizState.State) => {
   try {
     console.error("\n[VIZ_AGENT][GRAPH][GENERATOR] Generating chart");
     
+    // Obtener chartProvider desde request o usar por defecto
+    const chartProvider = state.request.chartProvider || 'quickchart';
+    console.error(`[VIZ_AGENT][GRAPH][GENERATOR] Using chart provider: ${chartProvider}`);
+    
     const result = await generateChartTool(
       state.plan,
       state.request.data,
-      state.config
+      state.config,
+      chartProvider
     );
     
     console.error(`[VIZ_AGENT][GRAPH][GENERATOR] Chart generated successfully`);

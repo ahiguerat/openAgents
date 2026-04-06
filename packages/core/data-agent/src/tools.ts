@@ -1,109 +1,47 @@
 import { tool } from "@langchain/core/tools";
 import { z } from "zod";
-import { ur } from "zod/v4/locales";
+import { DataProviderFactory } from "./providers/index.js";
 
 /**
- * Tool para ejecutar consultas HTTP a la API CTI
+ * Tool para ejecutar consultas a proveedores de datos
  */
 export const fetchCtiDataTool = tool(
-  async ({ url, method = "GET" }: { url: string; method?: string }) => {
+  async ({ 
+    url, 
+    method = "GET",
+    dataProvider = "cti"
+  }: { 
+    url: string; 
+    method?: string;
+    dataProvider?: string;
+  }) => {
     try {
-      console.log("\n" + "=".repeat(80));
-      console.log(" [API REQUEST] Iniciando petición HTTP");
-      console.log("=".repeat(80));
-      console.log(` URL: ${url}`);
-      console.log(` Método: ${method}`);
-      console.log(` Timestamp: ${new Date().toISOString()}`);
+      console.log(`\n[fetchCtiDataTool] Usando data provider: ${dataProvider}`);
       
-      // Parse URL para mostrar detalles
-      const urlObj = new URL(url);
-      console.log(`\n Detalles de la URL:`);
-      console.log(`   - Base: ${urlObj.origin}`);
-      console.log(`   - Path: ${urlObj.pathname}`);
+      // Obtener el provider apropiado
+      const provider = await DataProviderFactory.getProvider(dataProvider);
       
-      if (urlObj.search) {
-        console.log(`\n Query Parameters:`);
-        urlObj.searchParams.forEach((value, key) => {
-          try {
-            const parsed = JSON.parse(value);
-            console.log(`   - ${key}:`, JSON.stringify(parsed, null, 6));
-          } catch {
-            console.log(`   - ${key}: ${value}`);
-          }
-        });
-      }
-
-      console.log("\n Enviando petición...");
-      const startTime = Date.now();
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      const duration = Date.now() - startTime;
-      console.log(`Tiempo de respuesta: ${duration}ms`);
-
-      if (!response.ok) {
-        console.log("\n" + "X".repeat(40));
-        console.log(` [API ERROR] HTTP ${response.status}: ${response.statusText}`);
-        const errorText = await response.text();
-        console.log(` Response body:`);
-        console.log(errorText);
-        console.log("X".repeat(40) + "\n");
-        
+      console.log(`[fetchCtiDataTool] Provider seleccionado: ${provider.getName()}`);
+      console.log(`[fetchCtiDataTool] Base URL: ${provider.getBaseUrl()}`);
+      
+      // Validar parámetros
+      if (!provider.validateParams({ url, method })) {
         return {
           success: false,
-          error: `HTTP ${response.status}: ${response.statusText}`,
-          details: errorText,
+          error: `Parámetros inválidos para el provider '${dataProvider}'`,
         };
       }
 
-      const data = await response.json();
-      const dataSize = JSON.stringify(data).length;
-
-      console.log("\n" + "V".repeat(40));
-      console.log(` [API SUCCESS] Petición exitosa!`);
-      console.log(` Status: ${response.status} ${response.statusText}`);
-      console.log(` Tamaño de datos: ${dataSize} bytes (${(dataSize / 1024).toFixed(2)} KB)`);
+      // Ejecutar la consulta usando el provider
+      const result = await provider.fetchData(url, method);
       
-      if (Array.isArray(data)) {
-        console.log(` Número de registros: ${data.length}`);
-        if (data.length > 0) {
-          console.log(`\n Muestra del primer registro:`);
-          console.log(JSON.stringify(data[0], null, 2));
-        }
-      } else {
-        console.log(`\n Datos recibidos:`);
-        console.log(JSON.stringify(data, null, 2));
-      }
-      
-      console.log("\n Response Headers:");
-      response.headers.forEach((value, key) => {
-        console.log(`   - ${key}: ${value}`);
-      });
-      
-      console.log("V".repeat(40) + "\n");
-
-      return {
-        success: true,
-        data,
-        status: response.status,
-        headers: Object.fromEntries(response.headers.entries()),
-      };
+      return result;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : "Error desconocido";
-      const errorStack = error instanceof Error ? error.stack : "";
       
       console.log("\n" + "X".repeat(40));
       console.log(` [EXCEPTION] Error capturado en fetchCtiDataTool`);
       console.log(` Mensaje: ${errorMsg}`);
-      if (errorStack) {
-        console.log(`\n Stack trace:`);
-        console.log(errorStack);
-      }
       console.log("X".repeat(40) + "\n");
 
       return {
@@ -115,14 +53,19 @@ export const fetchCtiDataTool = tool(
   {
     name: "fetch_cti_data",
     description:
-      "Ejecuta una consulta HTTP GET a la API CTI. Usa esta tool cuando tengas una URL completa y quieras obtener los datos de mediciones.",
+      "Ejecuta una consulta a un proveedor de datos. Por defecto usa CTI API. Usa esta tool cuando tengas una URL y quieras obtener datos de mediciones.",
     schema: z.object({
-      url: z.string().describe("URL completa del endpoint CTI a consultar"),
+      url: z.string().describe("URL completa o path relativo del endpoint a consultar"),
       method: z
         .string()
         .optional()
         .default("GET")
         .describe("Método HTTP (GET, POST, etc)"),
+      dataProvider: z
+        .string()
+        .optional()
+        .default("cti")
+        .describe("Proveedor de datos a usar (cti, postgres, mongodb, etc). Por defecto: cti"),
     }),
   }
 );

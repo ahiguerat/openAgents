@@ -16,6 +16,7 @@ export interface VisualizationRequest {
   prompt: string;
   data: any[];
   suggestedType?: string;
+  chartProvider?: string; // Proveedor de gráficas: 'quickchart', 'chartjs', 'plotly', etc. Default: 'quickchart'
 }
 
 export interface VisualizationResponse {

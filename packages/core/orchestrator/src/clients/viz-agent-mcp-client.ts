@@ -36,7 +36,7 @@ export class VizAgentMCPClient {
     console.error(`[ORCHESTRATOR][VIZ-CLIENT] Available tools: ${tools.tools.map((t: any) => t.name).join(", ")}`);
   }
 
-  async createVisualization(prompt: string, data: any, suggestedType?: string): Promise<any> {
+  async createVisualization(prompt: string, data: any, suggestedType?: string, chartProvider?: string): Promise<any> {
     if (!this.client) {
       throw new Error("MCP client not connected");
     }
@@ -44,6 +44,9 @@ export class VizAgentMCPClient {
     console.error(`[ORCHESTRATOR][VIZ-CLIENT] Calling create_visualization`);
     console.error(`[ORCHESTRATOR][VIZ-CLIENT] Prompt: ${prompt}`);
     console.error(`[ORCHESTRATOR][VIZ-CLIENT] Data size: ${JSON.stringify(data).length} bytes`);
+    if (chartProvider) {
+      console.error(`[ORCHESTRATOR][VIZ-CLIENT] Chart provider: ${chartProvider}`);
+    }
 
     // Crear timeout personalizado de 5 minutos para visualizaciones con muchos datos
     const timeoutPromise = new Promise((_, reject) => {
@@ -52,7 +55,7 @@ export class VizAgentMCPClient {
 
     const callPromise = this.client.callTool({
       name: "create_visualization",
-      arguments: { prompt, data, suggestedType },
+      arguments: { prompt, data, suggestedType, chartProvider },
     });
 
     // Race entre la llamada y el timeout

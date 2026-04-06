@@ -25,7 +25,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "query_cti_measurements",
         description:
-          "Consulta datos de mediciones eléctricas de la API CTI en lenguaje natural. Soporta consultas sobre voltaje, corriente, potencia, energía, temperatura, presión, nivel de aceite, posición de tap, maniobras y eventos de contadores. Puede filtrar por tipo de sensor (DC, LBT, TR, TSC), meterId, cimId, dcId, y rangos de tiempo.",
+          "Consulta datos de mediciones eléctricas usando un data provider. Por defecto usa CTI API. Soporta consultas sobre voltaje, corriente, potencia, energía, temperatura, presión, nivel de aceite, posición de tap, maniobras y eventos de contadores. Puede filtrar por tipo de sensor (DC, LBT, TR, TSC), meterId, cimId, dcId, y rangos de tiempo.",
         inputSchema: {
           type: "object",
           properties: {
@@ -33,6 +33,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "string",
               description:
                 "Consulta en lenguaje natural. Ejemplos: 'Dame el voltaje del contador DC 123 en las últimas 24 horas', 'Potencia activa del transformador en intervalos de 15 minutos', 'Temperatura del transformador TR en las últimas 12 horas'",
+            },
+            dataProvider: {
+              type: "string",
+              description:
+                "Proveedor de datos a usar. Opciones: 'cti' (default), 'postgres', 'mongodb', etc.",
             },
           },
           required: ["query"],
@@ -67,16 +72,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     switch (name) {
       case "query_cti_measurements": {
         const query = (args as any)?.query as string;
+        const dataProvider = (args as any)?.dataProvider as string | undefined;
 
         if (!query) {
           throw new Error("El parámetro 'query' es requerido");
         }
 
         console.error("[DATA_AGENT][MCP] Query: %s", query);
+        console.error("[DATA_AGENT][MCP] Provider: %s", dataProvider || 'cti (default)');
 
         const graph = buildGraph();
         const result = await graph.invoke({
           userPrompt: query,
+          dataProvider: dataProvider || 'cti',
           rawModelOutput: "",
           parsedPlan: null,
           finalUrl: null,

@@ -1,61 +1,234 @@
 # Data Agent
 
-## Descripción
+**Fecha**: 2026-04-06
+**Versión**: 1.0.0
 
-El Data Agent es un agente especializado en la obtención de datos de mediciones eléctricas desde la API CTI (Ormazabal). Actúa como interfaz inteligente entre solicitudes en lenguaje natural y consultas estructuradas a la API, utilizando un LLM para interpretar las peticiones y generar las llamadas apropiadas.
+## Índice
+1. [Descripción](#1-descripción)
+2. [Arquitectura](#2-arquitectura)
+3. [Componentes](#3-componentes)
+  3.1. [MCP Server](#31-mcp-server-srcmcp-serverts)
+  3.2. [Data Providers](#32-data-providers-srcproviders)
+  3.3. [Graph](#33-graph-srcgraphts)
+  3.4. [Planner](#34-planner-srcpromptsts)
+  3.5. [Tools](#35-tools-srctoolsts)
+  3.6. [Schema Validator](#36-schema-validator)
+  3.7. [LLM Abstraction](#37-llm-abstraction-srcllm-flexiblets)
+4. [Flujo de Ejecución](#4-flujo-de-ejecución)
+5. [Configuración](#5-configuración)
+6. [API CTI - Parámetros](#6-api-cti---parámetros)
+7. [Uso](#7-uso)
+  7.1. [Como MCP Server](#71-como-mcp-server)
+  7.2. [Como módulo](#72-como-módulo)
+8. [Extensibilidad](#8-extensibilidad)
+9. [Estructura de Directorios](#9-estructura-de-directorios)
+10. [Dependencias Principales](#10-dependencias-principales)
+11. [Desarrollo](#11-desarrollo)
+12. [Manejo de Errores](#12-manejo-de-errores)
 
-## Arquitectura
 
-El agente utiliza LangGraph para coordinar un flujo de trabajo de dos nodos:
+## 1. Descripción
 
+El Data Agent es un agente especializado en la obtención de datos de mediciones eléctricas. Actúa como interfaz inteligente entre solicitudes en lenguaje natural y consultas estructuradas a diversos proveedores de datos, utilizando un LLM para interpretar las peticiones y generar las llamadas apropiadas.
+
+Implementa el **patrón Strategy** para desacoplar la obtención de datos de la fuente específica, permitiendo conectarse fácilmente a diferentes sistemas (CTI API, PostgreSQL, MongoDB, etc.).
+
+## 2. Arquitectura
+
+El agente utiliza **LangGraph** como orquestador y aplica los patrones **Strategy** (Data Providers) y **Factory** (LLM) para desacoplar dependencias externas.
+
+### Diagrama de Flujo
+
+```mermaid
+flowchart LR
+    Client[MCP Client] -->|1. query| Entry[Data Agent<br/>MCP Server]
+    Entry -->|2. invoke| Graph[LangGraph<br/>State Machine]
+    
+    Graph -->|3. analyze| Planner[Planner Node<br/>+ LLM]
+    Planner -->|4. plan| Fetcher[Fetcher Node<br/>+ DataProvider]
+    
+    Planner -.->|uses| LLM[LLM Service<br/>Copilot/OpenRouter]
+    Fetcher -.->|uses| API[CTI API<br/>Measurements]
+    
+    Fetcher -->|5. response| Graph
+    Graph -->|6. result| Entry
+    Entry -->|7. return| Client
+    
+    style Entry fill:#4A90E2,stroke:#2E5C8A,stroke-width:3px,color:#fff
+    style Graph fill:#50C878,stroke:#2D7A4A,stroke-width:2px,color:#fff
+    style Planner fill:#9B59B6,stroke:#6C3A82,stroke-width:2px,color:#fff
+    style Fetcher fill:#FF6B6B,stroke:#C44545,stroke-width:2px,color:#fff
+    style LLM fill:#FFA500,stroke:#CC8400,stroke-width:2px,color:#fff
+    style API fill:#FFA500,stroke:#CC8400,stroke-width:2px,color:#fff
 ```
-User Query (natural language)
-         |
-         v
-    [PLANNER]
-    - Analiza el prompt con LLM
-    - Identifica measurement type
-    - Extrae filtros (sensor, fechas, campos)
-    - Genera plan estructurado
-         |
-         v
-    [FETCHER]
-    - Construye URL de API
-    - Ejecuta petición HTTP
-    - Procesa respuesta
-    - Maneja reintentos si hay errores
-         |
-         v
-    Structured Data (JSON)
+
+**Flujo:**
+1. Cliente envía query en lenguaje natural
+2. MCP Server invoca LangGraph
+3. Planner analiza query con LLM y genera plan estructurado
+4. Fetcher obtiene datos del proveedor configurado
+5. Response con datos estructurados
+6. Graph retorna resultado
+7. Cliente recibe respuesta JSON
+    
+### Diagrama de Componentes
+
+```mermaid
+graph TB
+    Client[MCP Client]
+    
+    subgraph DataAgent[Data Agent]
+        MCP[MCP Server<br/>Entry Point]
+        Graph[LangGraph<br/>Orchestrator]
+        
+        subgraph Core[Core Components]
+            Planner[Planner<br/>LLM Integration]
+            Providers[Data Providers<br/>Strategy Pattern]
+            Validator[Schema Validator]
+        end
+    end
+    
+    LLM[LLM Service<br/>Copilot/OpenRouter]
+    API[CTI API<br/>Data Source]
+    
+    Client -->|request| MCP
+    MCP --> Graph
+    Graph --> Planner
+    Graph --> Providers
+    Graph --> Validator
+    
+    Planner -.->|query| LLM
+    Providers -.->|fetch| API
+    
+    Graph --> MCP
+    MCP -->|response| Client
+    
+    style MCP fill:#4A90E2,stroke:#2E5C8A,stroke-width:3px,color:#fff
+    style Graph fill:#50C878,stroke:#2D7A4A,stroke-width:2px,color:#fff
+    style Planner fill:#9B59B6,stroke:#6C3A82,stroke-width:2px,color:#fff
+    style Providers fill:#FF6B6B,stroke:#C44545,stroke-width:2px,color:#fff
+    style Validator fill:#FFB6C1,stroke:#FF69B4,stroke-width:2px,color:#fff
+    style LLM fill:#FFA500,stroke:#CC8400,stroke-width:2px,color:#fff
+    style API fill:#FFA500,stroke:#CC8400,stroke-width:2px,color:#fff
 ```
 
-## Componentes
+**Componentes principales:**
+- **MCP Server**: Punto de entrada que expone `query_cti_measurements`
+- **LangGraph**: Orquestador de flujo con 2 nodos (Planner → Fetcher)
+- **Planner**: Interpreta queries con LLM y genera plan estructurado
+- **Data Providers**: Abstracción para múltiples fuentes (CTI, Postgres, Mongo)
+- **Schema Validator**: Valida estructura del plan generado
 
-### 1. MCP Server (`src/mcp-server.ts`)
+### Patrones de Diseño Aplicados
+
+#### 1. **Factory Pattern** (LLM Abstraction)
+- **Propósito**: Desacoplar el agente de proveedores LLM específicos
+- **Implementación**: `LLMFactory` crea instancias de `LLMProvider`
+- **Beneficios**: 
+  - Cambio de proveedor mediante variable de entorno
+  - Facilita testing con mocks
+  - Extensible a nuevos LLMs sin modificar código core
+
+#### 2. **Strategy Pattern** (Data Providers)
+- **Propósito**: Abstraer la fuente de datos del agente
+- **Implementación**: `DataProviderFactory` + interfaz `IDataProvider`
+- **Beneficios**:
+  - Múltiples fuentes de datos (CTI API, PostgreSQL, MongoDB)
+  - Cambio de provider en tiempo de ejecución
+  - Fácil agregar nuevas fuentes
+
+#### 3. **State Machine Pattern** (LangGraph)
+- **Propósito**: Orquestar flujo de trabajo con estado compartido
+- **Nodos**: `planner` (interpreta query) → `fetcher` (obtiene datos)
+- **Estado**: `AgentState` compartido entre nodos (immutable updates)
+
+## 3. Componentes
+
+### 3.1. MCP Server (`src/mcp-server.ts`)
 
 Punto de entrada del agente. Expone el tool `query_cti_measurements` vía Model Context Protocol (MCP).
 
 **Interfaz:**
-- Input: Prompt en lenguaje natural
-- Output: JSON con datos estructurados de la API
+```typescript
+{
+  name: 'query_cti_measurements',
+  inputSchema: {
+    query: string,          // Prompt en lenguaje natural
+    dataProvider?: string   // Provider: 'cti', 'postgres', 'mongodb' (default: 'cti')
+  }
+}
+```
 
-### 2. Graph (`src/graph.ts`)
+- Input: Prompt en lenguaje natural + data provider opcional
+- Output: JSON con datos estructurados de la fuente de datos
+
+### 3.2. Data Providers (`src/providers/`)
+
+Sistema de proveedores de datos usando **Strategy Pattern** para desacoplar la fuente de datos.
+
+**Arquitectura:**
+
+```typescript
+// Interface común para todos los data providers
+interface IDataProvider {
+  getName(): string;
+  getBaseUrl(): string;
+  validateParams(params: any): boolean;
+  fetchData(url: string, method?: string, config?: DataProviderConfig): Promise<DataProviderResponse>;
+}
+
+// Factory para gestionar providers
+class DataProviderFactory {
+  static async initialize(): Promise<void>;
+  static async getProvider(name: string): Promise<IDataProvider>;
+  static registerProvider(name: string, provider: IDataProvider): void;
+  static listProviders(): string[];
+}
+```
+
+**Providers disponibles:**
+
+#### CTI Provider (`src/providers/cti-provider.ts`)
+
+**Características:**
+- Conecta con API CTI de Ormazabal
+- Soporta 12 tipos de mediciones eléctricas
+- Filtros: sensorType, meterId, dcId, cimId
+- Rangos de tiempo, intervalos, límites
+- Manejo de errores HTTP detallado
+
+**Mediciones soportadas:**
+- `voltage`, `current`, `active_power`, `reactive_power`
+- `active_energy`, `reactive_energy`, `temperature`, `pressure`
+- `level`, `tap_position`, `maneuvers`, `meter_event`
+
+**Método principal:**
+```typescript
+async fetchData(
+  url: string,
+  method: string = 'GET',
+  config?: DataProviderConfig
+): Promise<DataProviderResponse>
+```
+
+### 3.3. Graph (`src/graph.ts`)
 
 Orquestador basado en LangGraph que coordina el flujo:
 
 **Nodos:**
 - `plannerNode`: Interpreta el prompt y genera plan de consulta
-- `fetcherNode`: Ejecuta la petición HTTP a la API CTI
+- `fetcherNode`: Usa DataProviderFactory para obtener datos
 
 **Estado compartido:**
 - `userPrompt`: Query original del usuario
+- `dataProvider`: Provider seleccionado ('cti', 'postgres', etc.)
 - `rawModelOutput`: Respuesta raw del LLM
 - `parsedPlan`: Plan estructurado validado
 - `finalUrl`: URL construida para la API
-- `apiResponse`: Datos obtenidos de la API
+- `apiResponse`: Datos obtenidos
 - `error`: Mensaje de error si ocurre
 
-### 3. Planner (`src/prompts.ts`)
+### 3.4. Planner (`src/prompts.ts`)
 
 Sistema de prompts para el LLM que define:
 - Measurements disponibles (voltage, current, temperature, etc.)
@@ -63,30 +236,43 @@ Sistema de prompts para el LLM que define:
 - Field filters por measurement
 - Reglas de construcción de queries
 
-### 4. API Client (`src/graph.ts` - fetcherNode)
+### 3.5. Tools (`src/tools.ts`)
 
-Cliente HTTP con:
-- Construcción de URLs con parámetros correctos
-- Manejo de filtros (sensorType, meterId, dcId, cimId)
-- Retry logic para errores transitorios
-- Parsing de respuestas JSON y CSV
+**Descripción:** Herramienta para ejecutar consultas a proveedores de datos.
 
-### 5. Schema Validator (`src/cti-schema.ts`)
+#### fetchCtiDataTool()
+```typescript
+async fetchCtiDataTool({
+  url: string,
+  method?: string,
+  dataProvider?: string
+}): Promise<DataProviderResponse>
+```
 
-Define y valida:
+**Funcionalidad:**
+- **Factory Pattern**: Usa `DataProviderFactory.getProvider(dataProvider)` para obtener el provider correcto
+- **Validación**: Verifica que el provider esté disponible y los parámetros sean válidos
+- **Delegación**: Llama a `provider.fetchData(url, method, config)`
+- **Error handling**: Captura y reporta errores con contexto detallado
+
+**Providers soportados:** cti (default), postgres (futuro), mongodb (futuro)
+
+### 3.6. Schema Validator 
+
+Define y valida (`src/cti-schema.ts`):
 - Measurements permitidos
 - Field filters por measurement
 - Sensor types válidos
 - Estructura del plan de consulta
 
-### 6. LLM Abstraction (`src/llm-flexible.ts`)
+### 3.7. LLM Abstraction (`src/llm-flexible.ts`)
 
 Capa de abstracción para providers LLM:
 - Soporta GitHub Copilot SDK
 - Soporta OpenRouter
 - Configuración vía variables de entorno
 
-## Flujo de Ejecución
+## 4. Flujo de Ejecución
 
 ### Ejemplo: "Dame el voltaje del contador LGZ0011605102 de los últimos 7 días"
 
@@ -140,7 +326,7 @@ Capa de abstracción para providers LLM:
    }
    ```
 
-## Configuración
+## 5. Configuración
 
 ### Variables de Entorno (.env)
 
@@ -155,7 +341,7 @@ OPENROUTER_MODEL=nvidia/nemotron-3-nano-30b-a3b:free
 CTI_API_BASE_URL=http://192.168.45.18:2022
 ```
 
-## API CTI - Parámetros
+## 6. API CTI - Parámetros
 
 ### Measurements Soportados
 
@@ -191,16 +377,16 @@ CTI_API_BASE_URL=http://192.168.45.18:2022
 | `sampling` | min/max/mean | Tipo de muestreo |
 | `limit` | Número | Máximo registros |
 
-## Uso
+## 7. Uso
 
-### Como MCP Server
+### 7.1. Como MCP Server
 
 ```bash
 npm run build
 npm run mcp
 ```
 
-### Como módulo
+### 7.2. Como módulo
 
 ```typescript
 import { buildGraph } from './graph.js';
@@ -208,53 +394,78 @@ import { buildGraph } from './graph.js';
 const graph = buildGraph();
 const result = await graph.invoke({
   userPrompt: "Dame el voltaje del contador LGZ0011605102",
-  plan: null,
-  dataAgentResponse: null,
-  finalMessage: "",
+  dataProvider: 'cti', // o 'postgres', 'mongodb'
+  rawModelOutput: "",
+  parsedPlan: null,
+  finalUrl: null,
+  toolResults: [],
+  apiResponse: null,
+  reasoningTokens: null,
   error: null,
 });
 
 console.log(result.apiResponse);
 ```
 
-## Diagrama de Arquitectura
+## 8. Extensibilidad
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      MCP SERVER                             │
-│  (Interfaz externa vía Model Context Protocol)             │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       │ Tool: query_cti_measurements
-                       │ Input: { prompt: string }
-                       │
-┌──────────────────────┴──────────────────────────────────────┐
-│                    LANGGRAPH                                │
-│                                                             │
-│  ┌──────────────┐         ┌──────────────┐                │
-│  │   PLANNER    │────────>│   FETCHER    │                │
-│  │              │         │              │                │
-│  │ - Parse NL   │         │ - Build URL  │                │
-│  │ - Call LLM   │         │ - HTTP GET   │                │
-│  │ - Validate   │         │ - Parse JSON │                │
-│  │ - Extract    │         │ - Retry      │                │
-│  └──────────────┘         └──────────────┘                │
-│         │                        │                         │
-│         v                        v                         │
-│    CtiPlan (validated)    API Response (JSON)             │
-└─────────────────────────────────────────────────────────────┘
-                       │
-                       │ Output: { success, apiResponse, plan }
-                       │
-┌──────────────────────┴──────────────────────────────────────┐
-│                    API CTI                                  │
-│  http://192.168.45.18:2022/api/v2/data/measurements/{type}  │
-│                                                             │
-│  Returns: Array of measurement objects                     │
-└─────────────────────────────────────────────────────────────┘
+### Agregar un Nuevo Data Provider
+
+Para agregar un nuevo proveedor de datos (ej: MySQL, InfluxDB, etc.):
+
+1. **Crear implementación del provider:**
+
+```typescript
+// src/providers/mysql-provider.ts
+import { IDataProvider, DataProviderResponse } from './index.js';
+
+export class MySQLProvider implements IDataProvider {
+  getName(): string {
+    return 'mysql';
+  }
+
+  getBaseUrl(): string {
+    return process.env.MYSQL_HOST || 'localhost:3306';
+  }
+
+  validateParams(params: any): boolean {
+    // Validar parámetros específicos de MySQL
+    return params && params.query;
+  }
+
+  async fetchData(query: string): Promise<DataProviderResponse> {
+    // Implementar lógica de conexión y query a MySQL
+    const connection = await mysql.createConnection({/*...*/});
+    const [rows] = await connection.execute(query);
+    return {
+      success: true,
+      data: rows,
+    };
+  }
+}
 ```
 
-## Estructura de Directorios
+2. **Registrar en el factory:**
+
+```typescript
+// src/providers/index.ts
+static async initialize(): Promise<void> {
+  // ... existing providers
+  
+  const { MySQLProvider } = await import('./mysql-provider.js');
+  this.registerProvider('mysql', new MySQLProvider());
+}
+```
+
+3. **Usar desde el orchestrator:**
+
+```typescript
+// El orchestrator detecta "mysql" en el prompt
+// y lo pasa al data-agent automáticamente
+await dataAgentClient.queryMeasurements(query, 'mysql');
+```
+
+## 9. Estructura de Directorios
 
 ```
 data-agent/
@@ -276,7 +487,7 @@ data-agent/
 └── README.md
 ```
 
-## Dependencias Principales
+## 10. Dependencias Principales
 
 - `@langchain/langgraph`: Orquestación de flujo
 - `@langchain/core`: Primitivos de LangChain
@@ -285,7 +496,7 @@ data-agent/
 - `axios`: Cliente HTTP
 - `zod`: Validación de schemas
 
-## Desarrollo
+## 11. Desarrollo
 
 ### Build
 
@@ -305,7 +516,7 @@ npm run mcp
 npm run dev
 ```
 
-## Manejo de Errores
+## 12. Manejo de Errores
 
 El agente implementa varios niveles de manejo de errores:
 
@@ -314,12 +525,5 @@ El agente implementa varios niveles de manejo de errores:
 3. **Timeout**: Peticiones HTTP con timeout de 30 segundos
 4. **Parsing robusto**: Maneja respuestas JSON y CSV
 5. **Error propagation**: Errores se propagan con mensajes descriptivos
-
-## Limitaciones
-
-- Requiere conectividad con la API CTI
-- Depende de LLM para interpretación (puede fallar con prompts ambiguos)
-- Límite de 5000 registros por consulta (configurable en API)
-- No cachea resultados (todas las consultas golpean la API)
 
 

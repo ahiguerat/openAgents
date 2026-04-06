@@ -1,54 +1,184 @@
 # Visualization Agent
 
-## Descripción
+**Fecha**: 2026-04-06
+**Versión**: 1.0.0
+
+## Índice
+1. [Descripción](#1-descripción)
+2. [Arquitectura](#2-arquitectura)
+3. [Componentes](#3-componentes)
+   3.1. [MCP Server](#31-mcp-server-srcmcp-serverts)
+   3.2. [Graph](#32-graph-srcgraphts)
+   3.3. [Planner](#33-planner-srcplannerts)
+   3.4. [Chart Generators](#34-chart-generators-srcgenerators)
+   3.5. [Tools](#35-tools-srctoolsts)
+   3.6. [Types](#36-types-srctypests)
+   3.7. [LLM Abstraction](#37-llm-abstraction)
+   3.8. [LLM Provider](#38-llm-provider)
+4. [Flujo de Ejecución](#4-flujo-de-ejecución)
+5. [Configuración](#5-configuración)
+    5.1. [Variables de Entorno](#51-variables-de-entorno)
+    5.2. [Instalación](#52-instalación)
+    5.3. [Ejecución](#53-ejecución)
+6. [Tipos de Visualización Detallados](#6-tipos-de-visualización-detallados)
+    6.1. [Line Chart](#61-line-chart-gráfica-de-líneas)
+    6.2. [Bar Chart](#62-bar-chart-gráfica-de-barras)
+    6.3. [Pie Chart](#63-pie-chart-gráfica-circular)
+    6.4. [Scatter](#64-scatter-diagrama-de-dispersión)
+    6.5. [Area Chart](#65-area-chart-gráfica-de-área)
+    6.6. [Radar Chart](#66-radar-chart-gráfica-de-radar)
+    6.7. [Histogram](#67-histogram-histograma)
+    6.8. [Heatmap](#68-heatmap-mapa-de-calor)
+    6.9. [Table](#69-table-tabla)
+7. [Herramientas de Análisis Avanzadas](#7-herramientas-de-análisis-avanzadas)
+8. [Uso](#8-uso)
+    8.1. [Como MCP Server](#81-como-mcp-server)
+    8.2. [Como módulo](#82-como-módulo)
+    8.3. [Integración con Orchestrator](#83-integración-con-orchestrator)
+9. [Estructura de Directorios](#9-estructura-de-directorios)
+10. [Dependencias Principales](#10-dependencias-principales)
+11. [Manejo de Errores](#11-manejo-de-errores)
+12. [Extensibilidad](#12-extensibilidad)
+   12.1. [Agregar nuevo tipo de gráfica](#121-agregar-nuevo-tipo-de-gráfica)
+   12.2. [Agregar nuevo Chart Provider](#122-agregar-nuevo-chart-provider)
+
+
+## 1. Descripción
 
 El Visualization Agent es un agente especializado en la generación de visualizaciones de datos. Recibe datos estructurados y un prompt en lenguaje natural, y crea gráficos profesionales adaptándose al contexto de los datos. Utiliza **LangGraph** para orquestar un pipeline de 3 etapas y un **LLM** para decidir inteligentemente qué tipo de visualización es más apropiada.
 
-## Arquitectura
+## 2. Arquitectura
 
-El agente implementa un **grafo de estado basado en LangGraph** con tres nodos secuenciales:
+El agente utiliza **LangGraph** como orquestador con 3 nodos secuenciales, y aplica los patrones **Strategy** (Chart Generators) y **Factory** (LLM) para desacoplar dependencias externas.
 
+### Diagrama de Flujo
+
+```mermaid
+flowchart LR
+    Client[MCP Client] -->|1. request| Entry[Viz Agent<br/>MCP Server]
+    Entry -->|2. invoke| Graph[LangGraph<br/>State Machine]
+    
+    Graph -->|3. analyze| Planner[Planner Node<br/>+ LLM]
+    Planner -->|4. plan| Generator[Generator Node<br/>+ ChartProvider]
+    Generator -->|5. output| Saver[Saver Node<br/>+ FileSystem]
+    
+    Planner -.->|uses| LLM[LLM Service<br/>Copilot/OpenRouter]
+    Generator -.->|uses| QuickChart[QuickChart API<br/>Chart Generation]
+    Saver -.->|writes| FS[File System<br/>output/]
+    
+    Saver -->|6. path| Graph
+    Graph -->|7. result| Entry
+    Entry -->|8. return| Client
+    
+    style Entry fill:#4A90E2,stroke:#2E5C8A,stroke-width:3px,color:#fff
+    style Graph fill:#50C878,stroke:#2D7A4A,stroke-width:2px,color:#fff
+    style Planner fill:#9B59B6,stroke:#6C3A82,stroke-width:2px,color:#fff
+    style Generator fill:#FF6B6B,stroke:#C44545,stroke-width:2px,color:#fff
+    style Saver fill:#FFB6C1,stroke:#FF69B4,stroke-width:2px,color:#fff
+    style LLM fill:#FFA500,stroke:#CC8400,stroke-width:2px,color:#fff
+    style QuickChart fill:#FFA500,stroke:#CC8400,stroke-width:2px,color:#fff
+    style FS fill:#FFA500,stroke:#CC8400,stroke-width:2px,color:#fff
 ```
-Input: Data + User Prompt
-         |
-         v
-    [PLANNER NODE]
-    - Analiza prompt y datos con LLM
-    - Decide tipo de gráfica óptima
-    - Define campos X/Y, título, etiquetas
-    - Genera VisualizationPlan
-         |
-         v
-    [GENERATOR NODE]
-    - Construye configuración de gráfica
-    - Usa QuickChart API para imágenes
-    - Maneja casos especiales (CSV/HTML)
-    - Retorna URL o contenido
-         |
-         v
-    [SAVER NODE]
-    - Descarga imagen desde URL
-    - Guarda PNG/CSV/HTML en disco
-    - Retorna path y tamaño del archivo
-         |
-         v
-    Output: { filePath, fileSize, imageUrl, plan }
+
+**Flujo:**
+1. Cliente envía prompt y datos
+2. MCP Server invoca LangGraph
+3. Planner analiza datos con LLM y decide tipo de gráfica
+4. Generator crea visualización usando proveedor configurado
+5. Saver persiste resultado en disco (PNG/CSV/HTML)
+6. Path del archivo generado
+7. Graph retorna resultado
+8. Cliente recibe path y metadata
+
+### Diagrama de Componentes
+
+```mermaid
+graph TB
+    Client[MCP Client]
+    
+    subgraph VizAgent[Visualization Agent]
+        MCP[MCP Server<br/>Entry Point]
+        Graph[LangGraph<br/>Orchestrator]
+        
+        subgraph Core[Core Components]
+            Planner[Planner<br/>LLM Integration]
+            Generators[Chart Generators<br/>Strategy Pattern]
+            Saver[File Saver<br/>I/O Operations]
+        end
+    end
+    
+    LLM[LLM Service<br/>Copilot/OpenRouter]
+    QuickChart[QuickChart API<br/>Chart Generation]
+    FS[File System<br/>output/]
+    
+    Client -->|request| MCP
+    MCP --> Graph
+    Graph --> Planner
+    Graph --> Generators
+    Graph --> Saver
+    
+    Planner -.->|query| LLM
+    Generators -.->|create| QuickChart
+    Saver -.->|write| FS
+    
+    Graph --> MCP
+    MCP -->|response| Client
+    
+    style MCP fill:#4A90E2,stroke:#2E5C8A,stroke-width:3px,color:#fff
+    style Graph fill:#50C878,stroke:#2D7A4A,stroke-width:2px,color:#fff
+    style Planner fill:#9B59B6,stroke:#6C3A82,stroke-width:2px,color:#fff
+    style Generators fill:#FF6B6B,stroke:#C44545,stroke-width:2px,color:#fff
+    style Saver fill:#FFB6C1,stroke:#FF69B4,stroke-width:2px,color:#fff
+    style LLM fill:#FFA500,stroke:#CC8400,stroke-width:2px,color:#fff
+    style QuickChart fill:#FFA500,stroke:#CC8400,stroke-width:2px,color:#fff
+    style FS fill:#FFA500,stroke:#CC8400,stroke-width:2px,color:#fff
 ```
 
-**Tipos de visualización soportados:**
-- `line_chart`: Series temporales y tendencias
-- `bar_chart`: Comparaciones categóricas o temporales
-- `pie_chart`: Distribuciones porcentuales
-- `scatter`: Correlaciones entre variables
-- `area_chart`: Series temporales apiladas
-- `radar`: Comparación multivariable
-- `histogram`: Distribución de frecuencias
-- `heatmap`: Patrones de intensidad 2D
-- `table`: Datos tabulares en CSV
+**Componentes principales:**
+- **MCP Server**: Punto de entrada que expone `create_visualization`
+- **LangGraph**: Orquestador de flujo con 3 nodos (Planner → Generator → Saver)
+- **Planner**: Analiza datos con LLM y decide tipo de visualización
+- **Chart Generators**: Abstracción para múltiples proveedores (QuickChart, Plotly, Chart.js)
+- **Saver**: Persiste resultados en múltiples formatos (PNG, CSV, HTML)
 
-## Componentes
+### Patrones de Diseño Aplicados
 
-### 1. MCP Server (`src/mcp-server.ts`)
+#### 1. **Factory Pattern** (LLM Abstraction)
+- **Propósito**: Desacoplar el agente de proveedores LLM específicos
+- **Implementación**: `LLMFactory` crea instancias de `LLMProvider`
+- **Beneficios**: 
+  - Cambio de proveedor mediante variable de entorno
+  - Facilita testing con mocks
+  - Extensible a nuevos LLMs sin modificar código core
+
+#### 2. **Strategy Pattern** (Chart Generators)
+- **Propósito**: Abstraer el método de generación de gráficas
+- **Implementación**: `ChartGeneratorFactory` + interfaz `IChartGenerator`
+- **Beneficios**:
+  - Múltiples generadores (QuickChart, Chart.js, Plotly)
+  - Cambio de generador en tiempo de ejecución
+  - Fácil agregar nuevos proveedores de gráficas
+
+#### 3. **State Machine Pattern** (LangGraph)
+- **Propósito**: Orquestar flujo de trabajo con estado compartido
+- **Nodos**: `planner` (decide tipo) → `generator` (crea chart) → `saver` (persiste archivo)
+- **Estado**: `VizState` compartido entre nodos (immutable updates)
+
+### Tipos de Visualización Soportados
+
+- **`line_chart`**: Series temporales y tendencias
+- **`bar_chart`**: Comparaciones categóricas o temporales
+- **`pie_chart`**: Distribuciones porcentuales
+- **`scatter`**: Correlaciones entre variables
+- **`area_chart`**: Series temporales apiladas
+- **`radar`**: Comparación multivariable
+- **`histogram`**: Distribución de frecuencias
+- **`heatmap`**: Patrones de intensidad 2D
+- **`table`**: Datos tabulares en CSV
+
+## 3. Componentes
+
+### 3.1. MCP Server (`src/mcp-server.ts`)
 
 **Descripción:** Servidor MCP que expone el agente como herramienta `create_visualization`.
 
@@ -67,6 +197,7 @@ Input: Data + User Prompt
     prompt: string,           // Descripción en lenguaje natural
     data: Array<object>,      // Datos a visualizar
     suggestedType?: string,   // Tipo sugerido (opcional)
+    chartProvider?: string,   // Provider de gráficas: 'quickchart', 'chartjs', 'plotly' (default: 'quickchart')
     outputDir?: string        // Directorio de salida (default: ./output)
   }
 }
@@ -89,37 +220,23 @@ Input: Data + User Prompt
 }
 ```
 
-### 2. Graph (`src/graph.ts`)
+### 3.2. Graph (`src/graph.ts`)
 
-**Descripción:** Implementación del pipeline de visualización usando LangGraph.
-
-**Estado del grafo:**
-```typescript
-{
-  request: VisualizationRequest,  // Prompt + datos + tipo sugerido
-  plan: VisualizationPlan | null, // Plan generado por planner
-  imageUrl: string | null,        // URL de QuickChart
-  csvContent: string | null,      // Contenido CSV (si aplica)
-  isCSV: boolean,                 // Flag para tablas
-  htmlContent: string | null,     // Contenido HTML (si aplica)
-  isHTML: boolean,                // Flag para heatmaps interactivos
-  filePath: string | null,        // Path del archivo guardado
-  fileSize: number | null,        // Tamaño del archivo en bytes
-  config: ChartConfig,            // Configuración de dimensiones/estilos
-  outputDir: string,              // Directorio de salida
-  error: string | null            // Error si ocurrió
-}
-```
+Orquestador basado en LangGraph que coordina el flujo de visualización en 3 etapas.
 
 **Nodos:**
-- **plannerNode**: Invoca `planVisualization()` con LLM para generar plan
-- **generatorNode**: Invoca `generateChartTool()` para crear gráfica
-- **saverNode**: Invoca `saveImageTool()` para persistir resultado
+- `plannerNode`: Analiza datos y genera plan de visualización con LLM
+- `generatorNode`: Usa ChartGeneratorFactory para crear la gráfica
+- `saverNode`: Persiste el resultado (imagen, CSV o HTML) en disco
 
-**Flujo:**
-```
-START → planner → generator → saver → END
-```
+**Estado compartido (VizState):**
+- `request`: Solicitud original (prompt + data + provider)
+- `plan`: Plan estructurado de visualización
+- `imageUrl`, `csvContent`, `htmlContent`: Outputs generados
+- `filePath`, `fileSize`: Información del archivo guardado
+- `config`: Configuración de dimensiones y estilos
+- `outputDir`: Directorio de salida
+- `error`: Mensaje de error si ocurre
 
 **Función auxiliar:**
 ```typescript
@@ -130,55 +247,91 @@ executeVisualization(
 ): Promise<GraphResult>
 ```
 
-### 3. Planner (`src/planner.ts`)
+### 3.3. Planner (`src/planner.ts`)
 
-**Descripción:** Módulo que usa LLM para analizar datos y decidir la mejor visualización.
+Sistema de prompts que usa LLM para analizar datos y decidir la mejor visualización.
 
-**Función principal:**
-```typescript
-planVisualization(request: VisualizationRequest): Promise<VisualizationPlan>
-```
-
-**Sistema de prompts:**
-- Describe 9 tipos de gráficas con casos de uso específicos
-- Incluye reglas de decisión críticas para histogram vs bar_chart
-- Define distinción clara entre histogram (distribución de frecuencias) y heatmap (patrones 2D)
-- Proporciona vista previa de datos y campos disponibles
+**Funcionalidad:**
+- Describe 9 tipos de gráficas con casos de uso
+- Vista previa de datos y campos disponibles
+- Reglas de decisión (histogram vs bar_chart, heatmap vs otros)
 - Solicita respuesta en formato JSON estructurado
 
-**Características especiales:**
-- **Override inteligente**: Si el usuario dice "histograma" pero el LLM elige otro tipo, fuerza histogram
-- **Override de heatmap**: Si el usuario dice "mapa de calor" pero el LLM elige otro tipo, fuerza heatmap
-- **Normalización de tipos**: Convierte `bar` → `bar_chart`, `line` → `line_chart`, etc.
-- **Safe JSON parsing**: Maneja respuestas con markdown code blocks o texto adicional
+**Características:**
+- **Override inteligente**: Fuerza tipo si usuario especifica "histograma" o "mapa de calor"
+- **Normalización**: Convierte `bar` → `bar_chart`, `line` → `line_chart`
+- **Safe parsing**: Maneja markdown code blocks en respuesta LLM
 
-**Output:**
+**Plan generado (VisualizationPlan):**
 ```typescript
 {
-  chartType: 'line_chart' | 'bar_chart' | 'pie_chart' | 'scatter' | 'table' | 'area_chart' | 'radar' | 'histogram' | 'heatmap',
+  chartType: 'line_chart' | 'bar_chart' | 'pie_chart' | 'scatter' | 
+             'table' | 'area_chart' | 'radar' | 'histogram' | 'heatmap',
   title: string,
   xLabel?: string,
   yLabel?: string,
   xField: string,
   yField: string | string[],
-  valueField?: string,  // Solo para heatmap
+  valueField?: string,  // Heatmap only
   colors?: string[],
-  bins?: number,        // Solo para histogram
-  options?: Record<string, any>,
+  bins?: number,        // Histogram only
   rationale: string
 }
 ```
 
-### 4. Tools (`src/tools.ts`)
+### 3.4. Chart Generators (`src/generators/`)
 
-**Descripción:** Implementaciones de herramientas para generar y guardar visualizaciones.
+Sistema de proveedores de gráficas usando **Strategy Pattern** para desacoplar la generación de charts.
+
+**Interfaz común:**
+```typescript
+interface IChartGenerator {
+  readonly name: string;
+  generate(
+    plan: VisualizationPlan,
+    data: any[],
+    config: ChartConfig
+  ): Promise<ChartGenerationResult>;
+}
+```
+
+**Factory:**
+```typescript
+class ChartGeneratorFactory {
+  static async getGenerator(provider?: string): Promise<IChartGenerator>;
+  static register(name: string, generator: IChartGenerator): void;
+  static listGenerators(): string[];
+}
+```
+
+**Providers disponibles:**
+
+#### QuickChart Provider (`src/generators/quickchart.ts`)
+
+**Características:**
+- API externa para generación rápida de charts
+- Soporta 9 tipos de visualizaciones
+- Auto-sampling si data > 2500 puntos
+- Genera URL QuickChart para imágenes PNG
+- CSV export para tablas
+- HTML interactivo para heatmaps grandes
+
+**Tipos soportados:**
+- Charts: `line_chart`, `bar_chart`, `pie_chart`, `scatter`, `area_chart`, `radar`, `histogram`
+- Heatmap: `heatmap` (HTML interactivo con heatmap.js)
+- Table: `table` (CSV export)
+
+### 3.5. Tools (`src/tools.ts`)
+
+Herramientas para generación y persistencia de visualizaciones.
 
 #### generateChartTool()
 ```typescript
-generateChartTool(
+async generateChartTool(
   plan: VisualizationPlan,
   data: any[],
-  config: ChartConfig
+  config: ChartConfig,
+  provider: string = 'quickchart'
 ): Promise<{
   url: string;
   chartConfig: any;
@@ -190,14 +343,15 @@ generateChartTool(
 ```
 
 **Funcionalidad:**
-- **Sampling automático**: Reduce datos a 100 puntos si hay más (excepto histograms que necesitan todos los valores)
-- **Routing por tipo**: Delega a función específica según `plan.chartType`
+- **Factory Pattern**: Usa `ChartGeneratorFactory.getGenerator(provider)` para obtener el provider correcto
+- **Validación**: Verifica que el provider esté disponible
+- **Delegación**: Llama a `generator.generate(data, plan, config)`
+- **Sampling automático**: El provider decide cómo manejar límites de datos
+- **Routing por tipo**: Cada provider implementa los tipos que soporta
 - **Generación de CSV**: Para `table`, genera CSV directamente
-- **Generación de HTML**: Para `heatmap` complejos, genera HTML interactivo
-- **QuickChart integration**: Construye URL de imagen para tipos estándar
-- **Validación de límites**: Detecta URLs muy largas (>16KB) que pueden fallar
+- **Generación de HTML**: Para `heatmap` complejos, algunos providers generan HTML interactivo
 
-**Tipos soportados:** line_chart, bar_chart, pie_chart, scatter, radar, area_chart, histogram, heatmap, table
+**Providers soportados:** quickchart (default), chartjs (futuro), plotly (futuro)
 
 #### saveImageTool()
 ```typescript
@@ -214,120 +368,67 @@ saveImageTool(
 - Crea directorio de salida si no existe
 - **Para CSV**: Guarda como `table_data_YYYY-MM-DD_timestamp.csv`
 - **Para HTML**: Guarda como `heatmap_YYYY-MM-DD_timestamp.html`
-- **Para imágenes**: Descarga desde URL de QuickChart y guarda como `chart_YYYY-MM-DD_timestamp.png`
+- **Para imágenes**: Descarga desde URL del provider y guarda como `chart_YYYY-MM-DD_timestamp.png`
 - Retorna path absoluto y tamaño del archivo
 
-#### Funciones internas de generación
+### 3.6. Types (`src/types.ts`)
 
-**generateLineChartConfig(plan, data)**
-- Líneas con múltiples series (multi-yField)
-- Colores por serie, sin fill
-- Labels en ejes X e Y
-
-**generateBarChartConfig(plan, data)**
-- Barras verticales con múltiples series
-- Soporte para stacking opcional
-
-**generatePieChartConfig(plan, data)**
-- Agregación automática por campo X
-- Suma de valores en Y
-- Colores diferenciados por categoría
-
-**generateScatterChartConfig(plan, data)**
-- Puntos sin líneas
-- Útil para correlaciones
-
-**generateRadarChartConfig(plan, data)**
-- Gráfica circular multivariable
-- Útil para comparar perfiles
-
-**generateHistogramChartConfig(plan, data)**
-- Calcula bins (rangos) automáticos
-- Cuenta frecuencias por bin
-- Visualiza distribución de valores
-
-**generateHeatmapChartConfig(plan, data)**
-- Construye matriz 2D de intensidades
-- Para datasets pequeños: usa QuickChart con bubbles
-- Para datasets grandes: genera HTML interactivo con Plotly.js
-
-#### Utilidades adicionales
-
-**exportToCSVTool(data, outputDir, filename)**
-- Exporta cualquier array a CSV con headers automáticos
-- Escapa comillas y comas correctamente
-
-**calculateStatsTool(data, field)**
-- Calcula: count, min, max, mean, median, stdDev
-- Filtra valores no numéricos
-
-**aggregateDataTool(data, groupBy, aggregateField, aggregationType)**
-- Agrupa por campo y aplica sum/avg/min/max/count
-
-**detectAnomaliesTool(data, field, threshold)**
-- Detecta outliers usando Z-score
-- Retorna anomalías y rango normal
-
-### 5. Types (`src/types.ts`)
-
-**Definiciones de tipos TypeScript:**
+Definiciones de tipos TypeScript para el sistema.
 
 ```typescript
 interface VisualizationPlan {
-  chartType: 'line_chart' | 'bar_chart' | 'pie_chart' | 'scatter' | 
-             'table' | 'area_chart' | 'radar' | 'histogram' | 'heatmap';
+  chartType: ChartType;
   title: string;
   xLabel?: string;
   yLabel?: string;
   xField: string;
   yField: string | string[];
+  valueField?: string;  // Heatmap
   colors?: string[];
-  options?: Record<string, any>;
+  bins?: number;        // Histogram
   rationale: string;
-  bins?: number;        // Histograms
-  valueField?: string;  // Heatmaps
 }
 
 interface VisualizationRequest {
   prompt: string;
   data: any[];
   suggestedType?: string;
+  chartProvider?: string;
 }
 
 interface ChartConfig {
-  width: number;      // Default: 800
-  height: number;     // Default: 600
-  backgroundColor?: string;  // Default: #ffffff
-  fontFamily?: string;       // Default: Arial
-  fontSize?: number;         // Default: 12
+  width: number;         // Default: 800
+  height: number;        // Default: 600
+  backgroundColor?: string;
+  fontFamily?: string;
+  fontSize?: number;
 }
 ```
 
-### 6. LLM Flexible (`src/llm-flexible.ts`)
+### 3.7. LLM Abstraction 
 
-**Descripción:** Factory pattern para proveedores LLM con singleton.
+Capa de abstracción para proveedores LLM usando **Factory Pattern**(`src/llm-flexible.ts`).
 
-**Clase LLMFactory:**
-```typescript
-static async getProvider(): Promise<LLMProvider>
-static createProvider(config: ProviderConfig): LLMProvider
-static reset(): void
-static async dispose(): Promise<void>
-```
+**LLMFactory:**
+- Singleton para gestión centralizada
+- Crea provider según configuración de entorno
+- Soporta Copilot SDK y OpenRouter
 
-**Proveedores soportados:**
-- **CopilotProvider**: Usa GitHub Copilot SDK (`@github/copilot-sdk`)
-- **OpenRouterProvider**: Usa OpenRouter API compatible con OpenAI
+**Configuración:**
 
-**Configuración desde .env:**
-```bash
+```env
 LLM_PROVIDER=copilot|openrouter
+COPILOT_MODEL=claude-sonnet-4.5
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_MODEL=nvidia/nemotron-3-nano-30b-a3b:free
+
 COPILOT_MODEL=claude-sonnet-4.5  # Opcional
 OPENROUTER_API_KEY=sk-or-v1-...  # Si provider=openrouter
 OPENROUTER_MODEL=...              # Opcional
 ```
 
 **Función helper:**
+
 ```typescript
 streamStructuredPlan({
   systemPrompt: string,
@@ -335,9 +436,9 @@ streamStructuredPlan({
 }): Promise<{ rawText: string }>
 ```
 
-### 7. LLM Provider (`src/llm-provider.ts`)
+### 3.8. LLM Provider
 
-**Interfaz abstracta:**
+**Interfaz abstracta (`src/llm-provider.ts`):**
 ```typescript
 interface LLMProvider {
   initialize(): Promise<void>;
@@ -350,267 +451,97 @@ interface LLMProvider {
 - `src/providers/copilot.ts`: CopilotProvider
 - `src/providers/openrouter.ts`: OpenRouterProvider
 
-## Flujo de Ejecución Detallado
+## 4. Flujo de Ejecución
 
-### Ejemplo 1: "Crea una gráfica de líneas del voltaje"
+### Ejemplo: "Crea una gráfica de líneas del voltaje"
 
-**1. Request llega al MCP Server:**
-```json
-{
-  "prompt": "Crea una gráfica de líneas del voltaje",
-  "data": [
-    {"timestamp": "2024-01-01T00:00:00Z", "voltage": 230.5},
-    {"timestamp": "2024-01-01T01:00:00Z", "voltage": 229.8},
-    ...  // 150 puntos más
-  ]
-}
+1. **MCP Server recibe request**
+
+   ```json
+   {
+     "prompt": "Crea una gráfica de líneas del voltaje",
+     "data": [
+       {"timestamp": "2024-01-01T00:00:00Z", "voltage": 230.5},
+       {"timestamp": "2024-01-01T01:00:00Z", "voltage": 229.8},
+       ...
+     ],
+     "chartProvider": "quickchart"
+   }
+   ```
+
+2. **PlannerNode analiza con LLM**
+   - Inspecciona estructura de datos: campos `timestamp`, `voltage`
+   - LLM decide tipo de gráfica apropiado
+   - Genera plan estructurado:
+   ```json
+   {
+     "chartType": "line_chart",
+     "title": "Evolución de Voltaje",
+     "xLabel": "Tiempo",
+     "yLabel": "Voltaje (V)",
+     "xField": "timestamp",
+     "yField": "voltage",
+     "rationale": "Serie temporal simple requiere line chart"
+   }
+   ```
+
+3. **GeneratorNode crea gráfica**
+   - Obtiene QuickChartGenerator via Factory
+   - Aplica sampling si data > 2500 puntos
+   - Construye configuración Chart.js
+   - Genera URL de QuickChart API
+   ```
+   https://quickchart.io/chart?c={...chartConfig...}
+   ```
+
+4. **SaverNode persiste resultado**
+   - Descarga imagen desde URL
+   - Guarda en `output/chart_2024-01-01_123456.png`
+   - Retorna path y tamaño del archivo
+
+5. **Response al caller**
+   ```json
+   {
+     "success": true,
+     "imagePath": "./output/chart_2024-01-01_123456.png",
+     "imageUrl": "https://quickchart.io/chart?c=...",
+     "format": "png",
+     "plan": {...},
+     "metadata": {
+       "timestamp": "2024-01-01T12:34:56Z",
+       "dataPoints": 152,
+       "generationTimeMs": 1250
+     }
+   }
+   ```
+## 5. Configuración
+
+### 5.1. Variables de Entorno (.env)
+
+```env
+# LLM Provider
+LLM_PROVIDER=copilot|openrouter
+COPILOT_MODEL=claude-sonnet-4.5
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_MODEL=anthropic/claude-3.5-sonnet
 ```
 
-**2. Graph inicia con estado inicial:**
-```typescript
-{
-  request: { prompt, data },
-  plan: null,
-  imageUrl: null,
-  filePath: null,
-  config: { width: 800, height: 600 },
-  outputDir: './output',
-  error: null
-}
-```
-
-**3. Planner Node:**
-- Analiza estructura de datos: detecta campos `timestamp` y `voltage`
-- Envía prompt a LLM con contexto de datos
-- LLM genera plan:
-```json
-{
-  "chartType": "line_chart",
-  "title": "Evolución de Voltaje",
-  "xLabel": "Tiempo",
-  "yLabel": "Voltaje (V)",
-  "xField": "timestamp",
-  "yField": "voltage",
-  "rationale": "Serie temporal simple requiere line chart"
-}
-```
-
-**4. Generator Node:**
-- Detecta 152 puntos > 100, aplica sampling a 100 puntos
-- Construye configuración QuickChart:
-```javascript
-{
-  type: 'line',
-  data: {
-    labels: ['2024-01-01T00:00:00Z', ...],
-    datasets: [{
-      label: 'voltage',
-      data: [230.5, 229.8, ...],
-      borderColor: '#3366CC',
-      fill: false
-    }]
-  },
-  options: { title: { text: 'Evolución de Voltaje' }, ... }
-}
-```
-- Genera URL de QuickChart (codifica JSON en URL)
-- Retorna: `imageUrl: "https://quickchart.io/chart?c=..."`
-
-**5. Saver Node:**
-- Descarga imagen desde URL
-- Crea directorio `output/` si no existe
-- Guarda como `output/chart_2024-01-01_1704067200000.png`
-- Retorna: `{ filePath: "...", size: 45231 }`
-
-**6. Respuesta final MCP:**
-```json
-{
-  "success": true,
-  "imagePath": "output/chart_2024-01-01_1704067200000.png",
-  "imageUrl": "https://quickchart.io/chart?c=...",
-  "format": "png",
-  "plan": { "chartType": "line_chart", ... },
-  "metadata": {
-    "timestamp": "2024-01-01T12:00:00Z",
-    "dataPoints": 152,
-    "generationTimeMs": 1847
-  }
-}
-```
-
-### Ejemplo 2: "Muestra distribución de frecuencias del voltaje en un histograma"
-
-**1. Request:**
-```json
-{
-  "prompt": "Muestra distribución de frecuencias del voltaje en un histograma",
-  "data": [
-    {"voltage": 228.5}, {"voltage": 231.2}, {"voltage": 229.8}, ...
-  ]  // 500 puntos
-}
-```
-
-**2. Planner Node:**
-- **Override detectado**: Prompt contiene "histograma"
-- Incluso si LLM elige otro tipo, se fuerza `chartType: 'histogram'`
-- Plan resultante:
-```json
-{
-  "chartType": "histogram",
-  "title": "Distribución de Voltaje",
-  "xField": "voltage",
-  "yField": "voltage",
-  "bins": 10,
-  "xLabel": "Rango de Voltaje",
-  "yLabel": "Frecuencia"
-}
-```
-
-**3. Generator Node:**
-- **No aplica sampling** (histogramas necesitan todos los datos)
-- Calcula bins automáticos:
-  - Min: 225.0, Max: 235.0, Range: 10.0
-  - Bin width: 1.0
-  - Bins: [225-226, 226-227, ..., 234-235]
-- Cuenta frecuencias por bin:
-  - [225-226]: 12 ocurrencias
-  - [226-227]: 45 ocurrencias
-  - ...
-- Construye bar chart con bins en X y frecuencias en Y
-
-**4. Saver & Response:**
-```json
-{
-  "success": true,
-  "imagePath": "output/chart_2024-01-01_1704067500000.png",
-  "plan": { "chartType": "histogram", "bins": 10 }
-}
-```
-
-### Ejemplo 3: "Crea mapa de calor de consumo por día y hora"
-
-**1. Request:**
-```json
-{
-  "prompt": "Crea mapa de calor de consumo por día y hora",
-  "data": [
-    {"day": "Lunes", "hour": 0, "consumption": 120.5},
-    {"day": "Lunes", "hour": 1, "consumption": 105.2},
-    ...  // 7 días × 24 horas = 168 puntos
-  ]
-}
-```
-
-**2. Planner Node:**
-```json
-{
-  "chartType": "heatmap",
-  "xField": "day",
-  "yField": "hour",
-  "valueField": "consumption",
-  "title": "Consumo por Día y Hora"
-}
-```
-
-**3. Generator Node:**
-- Construye matriz 2D: días × horas
-- Dataset pequeño (168 puntos), usa QuickChart con bubbles
-- Si fuera >1000 puntos, generaría HTML con Plotly
-
-**4. Output:**
-```json
-{
-  "success": true,
-  "imagePath": "output/chart_2024-01-01_1704067800000.png",
-  "format": "png"
-}
-```
-
-### Ejemplo 4: "Exporta los datos a tabla"
-
-**1. Request:**
-```json
-{
-  "prompt": "Exporta los datos a tabla",
-  "data": [
-    {"sensor": "S1", "value": 120.5, "status": "OK"},
-    {"sensor": "S2", "value": 115.3, "status": "OK"}
-  ]
-}
-```
-
-**2. Planner Node:**
-```json
-{
-  "chartType": "table"
-}
-```
-
-**3. Generator Node:**
-- No genera imagen, genera CSV:
-```csv
-sensor,value,status
-S1,120.5,OK
-S2,115.3,OK
-```
-- Retorna: `{ csvContent: "...", isCSV: true }`
-
-**4. Saver Node:**
-- Guarda CSV directamente
-- Path: `output/table_data_2024-01-01_1704068000000.csv`
-
-**5. Response:**
-```json
-{
-  "success": true,
-  "imagePath": "output/table_data_2024-01-01_1704068000000.csv",
-  "format": "csv"
-}
-```
-
-## Configuración
-
-### Variables de Entorno
-
-Crear archivo `.env` en la raíz del paquete:
+### 5.2. Instalación
 
 ```bash
-# Proveedor LLM (obligatorio)
-LLM_PROVIDER=copilot  # o "openrouter"
-
-# GitHub Copilot (si LLM_PROVIDER=copilot)
-COPILOT_MODEL=claude-sonnet-4.5  # Opcional, modelo por defecto
-
-# OpenRouter (si LLM_PROVIDER=openrouter)
-OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxx  # Obligatorio
-OPENROUTER_MODEL=anthropic/claude-3.5-sonnet  # Opcional
-```
-
-### Instalación
-
-```bash
-cd packages/core/visualization-agent
 npm install
-npm run build
 ```
 
-### Ejecución
+### 5.3. Ejecución
 
-**Modo MCP Server (para integración con Copilot):**
 ```bash
-npm run mcp
-# o
-node dist/mcp-server.js
+npm run start
 ```
 
-**Modo desarrollo (con hot reload):**
-```bash
-npm run dev
-```
 
-## Tipos de Visualización Detallados
+## 6. Tipos de Visualización Detallados
 
-### 1. Line Chart (Gráfica de Líneas)
+### 6.1. Line Chart (Gráfica de Líneas)
 **Uso:** Series temporales, tendencias, evolución de valores
 
 **Características:**
@@ -632,7 +563,7 @@ npm run dev
 // → Plan: { chartType: 'line_chart', xField: 'time', yField: 'voltage' }
 ```
 
-### 2. Bar Chart (Gráfica de Barras)
+### 6.2. Bar Chart (Gráfica de Barras)
 **Uso:** Comparaciones categóricas, valores por periodo
 
 **Características:**
@@ -654,7 +585,7 @@ npm run dev
 // → Plan: { chartType: 'bar_chart', xField: 'day', yField: 'consumption' }
 ```
 
-### 3. Pie Chart (Gráfica Circular)
+### 6.3. Pie Chart (Gráfica Circular)
 **Uso:** Distribución porcentual, proporciones
 
 **Características:**
@@ -676,7 +607,7 @@ npm run dev
 // → Plan: { chartType: 'pie_chart', xField: 'building', yField: 'consumption' }
 ```
 
-### 4. Scatter (Diagrama de Dispersión)
+### 6.4. Scatter (Diagrama de Dispersión)
 **Uso:** Correlaciones, relaciones entre variables
 
 **Características:**
@@ -697,7 +628,7 @@ npm run dev
 // → Plan: { chartType: 'scatter', xField: 'temperature', yField: 'consumption' }
 ```
 
-### 5. Area Chart (Gráfica de Área)
+### 6.5. Area Chart (Gráfica de Área)
 **Uso:** Series temporales con énfasis en volumen
 
 **Características:**
@@ -717,7 +648,7 @@ npm run dev
 // → Plan: { chartType: 'area_chart', xField: 'hour', yField: ['zone1','zone2','zone3'] }
 ```
 
-### 6. Radar Chart (Gráfica de Radar)
+### 6.6. Radar Chart (Gráfica de Radar)
 **Uso:** Comparación multivariable, perfiles
 
 **Características:**
@@ -738,7 +669,7 @@ npm run dev
 // → Plan: { chartType: 'radar', xField: 'metric', yField: ['sensor1','sensor2'] }
 ```
 
-### 7. Histogram (Histograma)
+### 6.7. Histogram (Histograma)
 **Uso:** Distribución de frecuencias, análisis estadístico
 
 **Características:**
@@ -769,7 +700,8 @@ npm run dev
 
 **IMPORTANTE:** El planner tiene lógica especial para forzar histogram si el usuario dice "histograma" o "distribución de frecuencias".
 
-### 8. Heatmap (Mapa de Calor)
+### 6.8. Heatmap (Mapa de Calor)
+
 **Uso:** Patrones 2D, correlaciones, densidad
 
 **Características:**
@@ -797,7 +729,8 @@ npm run dev
 //   }
 ```
 
-### 9. Table (Tabla CSV)
+### 6.9. Table (Tabla)
+
 **Uso:** Exportación de datos crudos
 
 **Características:**
@@ -818,7 +751,7 @@ npm run dev
 // → Output: table_data_YYYY-MM-DD_timestamp.csv
 ```
 
-## Herramientas de Análisis Avanzadas
+## 7. Herramientas de Análisis Avanzadas
 
 El agente incluye herramientas adicionales para análisis de datos (actualmente no expuestas directamente pero disponibles en el código):
 
@@ -868,439 +801,152 @@ const result = await detectAnomaliesTool(data, 'voltage', 3);
 // }
 ```
 
-## Uso Programático
+## 8. Uso
 
-### Como MCP Server (Recomendado)
-
-El agente está diseñado para ejecutarse como servidor MCP y ser llamado por un orchestrator o cliente MCP:
+### 8.1. Como MCP Server
 
 ```bash
-# Terminal 1: Iniciar servidor
-cd packages/core/visualization-agent
+npm run build
 npm run mcp
-
-# Terminal 2: Llamar desde cliente MCP
-# (Ver documentación del orchestrator)
 ```
 
-### Como Módulo Node.js
+### 8.2. Como módulo
 
 ```typescript
 import { executeVisualization } from './graph.js';
-import { DEFAULT_CHART_CONFIG } from './types.js';
 
 const result = await executeVisualization(
   {
     prompt: "Crea una gráfica de líneas del voltaje",
     data: [
       { time: "2024-01-01T00:00:00Z", voltage: 230.5 },
-      { time: "2024-01-01T01:00:00Z", voltage: 229.8 },
-      // ...
-    ]
+      ...
+    ],
+    chartProvider: 'quickchart'  // opcional
   },
-  DEFAULT_CHART_CONFIG,  // Opcional: { width: 800, height: 600 }
-  './output'             // Opcional: directorio de salida
+  { width: 800, height: 600 },   // ChartConfig opcional
+  './output'                      // outputDir opcional
 );
 
-console.log('Success:', result.error === null);
-console.log('Image saved at:', result.filePath);
-console.log('File size:', result.fileSize, 'bytes');
-console.log('Chart type:', result.plan?.chartType);
+console.log('Saved at:', result.filePath);
 ```
 
-### Integración con Orchestrator
-
-El orchestrator puede invocar el visualization agent vía MCP:
+### 8.3. Integración con Orchestrator
 
 ```typescript
-// En el orchestrator
-const vizClient = new MCPClient();
-await vizClient.connect('node', ['packages/core/visualization-agent/dist/mcp-server.js']);
+import { VisualizationAgentClient } from './orchestrator-client.js';
+const vizAgentClient = new VisualizationAgentClient();
 
-const result = await vizClient.callTool('create_visualization', {
-  prompt: "Dame una gráfica de barras del consumo por día",
-  data: fetchedData,
-  outputDir: './reports'
-});
-
-console.log(JSON.parse(result.content[0].text));
+await vizAgentClient.createVisualization(
+  "Crea una gráfica de líneas del voltaje",
+  [
+    { time: "2024-01-01T00:00:00Z", voltage: 230.5 },
+    ...
+  ],
+  'quickchart'  // chartProvider opcional
+);
 ```
 
-## Diagrama de Arquitectura
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     MCP SERVER                              │
-│         (mcp-server.ts - stdio transport)                   │
-│                                                             │
-│  Tool: create_visualization                                 │
-│  Input: { prompt, data[], suggestedType?, outputDir? }     │
-│  Output: { success, imagePath, imageUrl, plan, metadata }  │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-                       v
-┌─────────────────────────────────────────────────────────────┐
-│                   LANGGRAPH PIPELINE                        │
-│                    (graph.ts)                               │
-│                                                             │
-│   START                                              END    │
-│     ↓                                                  ↑     │
-│  ┌──────────┐      ┌──────────┐      ┌──────────┐    │     │
-│  │ PLANNER  │─────→│GENERATOR │─────→│  SAVER   │────┘     │
-│  └──────────┘      └──────────┘      └──────────┘          │
-│       │                  │                  │               │
-│   LLM call         Chart/CSV/HTML      File write          │
-│  (planner.ts)        (tools.ts)        (tools.ts)          │
-└─────────────────────────────────────────────────────────────┘
-                       │
-         ┌─────────────┴──────────────┐
-         │                            │
-         v                            v
-┌────────────────┐          ┌──────────────────┐
-│ LLM PROVIDERS  │          │   QUICKCHART     │
-│  (llm-*.ts)    │          │   External API   │
-│                │          │  chart rendering │
-│ - Copilot SDK  │          └──────────────────┘
-│ - OpenRouter   │
-└────────────────┘
-```
-
-## Estructura de Directorios
+## 9. Estructura de Directorios
 
 ```
 visualization-agent/
 ├── src/
-│   ├── mcp-server.ts           # Entrada MCP, maneja tools/list y tools/call
-│   ├── graph.ts                # Pipeline LangGraph (planner→generator→saver)
-│   ├── planner.ts              # Análisis con LLM, genera VisualizationPlan
-│   ├── tools.ts                # Implementación de generación y guardado
-│   ├── types.ts                # Interfaces TypeScript
-│   ├── llm-flexible.ts         # Factory de LLM providers
-│   ├── llm-provider.ts         # Interfaz abstracta LLMProvider
+│   ├── mcp-server.ts      # Punto de entrada MCP
+│   ├── graph.ts           # LangGraph orchestrator
+│   ├── planner.ts         # Sistema de prompts LLM
+│   ├── tools.ts           # Herramientas de generación/guardado
+│   ├── types.ts           # Definiciones TypeScript
+│   ├── llm-flexible.ts    # Abstracción LLM
+│   ├── llm-provider.ts    # Interfaz LLMProvider
 │   ├── generators/
-│   │   └── charts.ts           # [DEPRECATED - funcionalidad movida a tools.ts]
+│   │   ├── index.ts       # ChartGeneratorFactory
+│   │   ├── quickchart.ts  # QuickChart implementation
+│   │   └── charts.ts      # Chart.js helpers
 │   └── providers/
-│       ├── copilot.ts          # Implementación GitHub Copilot
-│       └── openrouter.ts       # Implementación OpenRouter
-├── dist/                       # Código TypeScript compilado
-├── output/                     # Gráficas, CSVs, HTMLs generados
-├── .env                        # Configuración LLM provider
-├── package.json                # Dependencias y scripts
-├── tsconfig.json               # Configuración TypeScript
+│       ├── copilot.ts     # GitHub Copilot integration
+│       └── openrouter.ts  # OpenRouter integration
+├── dist/                  # Código compilado
+├── output/                # Gráficas generadas
+├── .env                   # Variables de entorno
+├── package.json
+├── tsconfig.json
 └── README.md
 ```
 
-**Nota:** El directorio `generators/` contiene implementaciones legacy que han sido refactorizadas dentro de `tools.ts`. Se mantiene por compatibilidad pero la funcionalidad activa está en `tools.ts`.
+## 10. Dependencias Principales
 
-## Dependencias Principales
+- `@langchain/langgraph`: Orquestación de flujo
+- `@langchain/core`: Primitivos de LangChain
+- `@modelcontextprotocol/sdk`: Protocolo MCP
+- `@github/copilot-sdk`: GitHub Copilot integration
+- `quickchart-js`: Chart generation API
+- `openai`: OpenAI-compatible client (OpenRouter)
 
-```json
-{
-  "@github/copilot-sdk": "^0.2.0",
-  "@langchain/core": "^0.3.40",
-  "@langchain/langgraph": "^0.2.74",
-  "@modelcontextprotocol/sdk": "^1.0.4",
-  "quickchart-js": "^3.1.3",
-  "dotenv": "^16.4.5",
-  "openai": "^6.0.0"
+
+## 11. Manejo de Errores
+
+El agente implementa varios niveles de resiliencia:
+
+1. **Validación de entrada**: Verifica prompt y data requeridos
+2. **Safe JSON parsing**: Maneja markdown code blocks del LLM
+3. **Sampling automático**: Reduce datasets grandes a límites del provider
+4. **Override inteligente**: Fuerza tipo si usuario especifica explícitamente
+5. **Límites de URL**: Detecta y advierte URLs largas (QuickChart ~16KB)
+6. **Error propagation**: Captura errores y los propaga en estado del graph
+
+## 12. Extensibilidad
+
+### 12.1. Agregar nuevo tipo de gráfica
+
+1. Actualizar `ChartType` en `types.ts`
+2. Agregar generador en provider (ej: `quickchart.ts`)
+3. Actualizar prompts en `planner.ts` con casos de uso
+
+### 12.2. Agregar nuevo Chart Provider
+
+1. **Crear implementación del provider:**
+
+```typescript
+// src/generators/plotly-provider.ts
+import { IChartGenerator, ChartGenerationResult } from './index.js';
+
+export class PlotlyGenerator implements IChartGenerator {
+  readonly name = 'plotly';
+
+  async generate(
+    plan: VisualizationPlan,
+    data: any[],
+    config: ChartConfig
+  ): Promise<ChartGenerationResult> {
+    // Implementar lógica con Plotly
+    return { htmlContent, isHTML: true };
+  }
 }
 ```
 
-**Descripción:**
-- **@langchain/langgraph**: Orquestación del pipeline con estado compartido
-- **@langchain/core**: Primitivos de LangChain (Annotation, etc.)
-- **@modelcontextprotocol/sdk**: Servidor MCP sobre stdio
-- **@github/copilot-sdk**: Integración con GitHub Copilot
-- **quickchart-js**: Cliente para QuickChart API (generación de gráficas)
-- **openai**: Cliente OpenAI-compatible (usado por OpenRouter provider)
+2. **Registrar en el factory:**
 
-## Scripts de NPM
-
-```bash
-# Desarrollo con hot reload
-npm run dev
-
-# Compilar TypeScript a dist/
-npm run build
-
-# Ejecutar como MCP server (requiere build)
-npm run start
-npm run mcp  # Alias de start
-
-# Ejecutar tests (si existen)
-npm test
-```
-
-## Manejo de Errores
-
-El agente implementa múltiples capas de resiliencia:
-
-### 1. Validación de entrada
 ```typescript
-if (!request.params.arguments.prompt || !request.params.arguments.data) {
-  throw new Error('Missing required parameters: prompt and data');
+// src/generators/index.ts
+static async initialize(): Promise<void> {
+  // ... existing providers
+  
+  const { PlotlyGenerator } = await import('./plotly-provider.js');
+  this.register('plotly', new PlotlyGenerator());
 }
 ```
 
-### 2. Safe JSON parsing
-El planner tiene lógica para parsear JSON incluso si el LLM retorna:
-- Markdown code blocks (```json ... ```)
-- Texto explicativo antes/después del JSON
-- JSON embebido en texto
+3. **Usar desde el orchestrator:**
 
-### 3. Sampling automático
-Para datasets grandes, reduce automáticamente a 100 puntos:
 ```typescript
-if (plan.chartType !== 'histogram' && data.length > 100) {
-  processedData = sampleData(data, 100);
-}
+await vizAgentClient.createVisualization(
+  prompt, 
+  data, 
+  'plotly'  // chartProvider
+);
 ```
-
-**Excepción:** Histogramas NO se samplen porque necesitan todos los valores para calcular frecuencias correctamente.
-
-### 4. Override de tipo de gráfica
-Si el usuario dice "histograma" pero el LLM decide otro tipo, se fuerza:
-```typescript
-if (userPrompt.includes('histograma') && plan.chartType !== 'histogram') {
-  console.error('OVERRIDE: forcing histogram');
-  plan.chartType = 'histogram';
-}
-```
-
-### 5. Límites de URL
-QuickChart tiene límite de ~16KB en URLs. El agente detecta URLs largas:
-```typescript
-if (imageUrl.length > 16000) {
-  console.error(`WARNING: URL too long (${imageUrl.length})`);
-}
-```
-
-### 6. Propagación de errores
-Cada nodo del graph captura errores y los propaga en el estado:
-```typescript
-try {
-  // ... lógica del nodo
-} catch (error) {
-  return {
-    error: error instanceof Error ? error.message : String(error)
-  };
-}
-```
-
-## Limitaciones Conocidas
-
-### Técnicas
-- **QuickChart dependencia**: Requiere servicio externo, puede fallar si está caído
-- **Límite de URL**: URLs muy largas (>16KB) pueden fallar en QuickChart
-- **Sampling lossy**: Datasets >100 puntos pierden resolución (excepto histograms)
-- **No caching**: Regenera imágenes idénticas cada vez
-- **Gráficas estáticas**: Solo PNG, no interactivas
-
-### Funcionales
-- **Sin validación de datos**: No valida tipos ni rangos de valores
-- **Sin sugerencias proactivas**: No sugiere tipos alternativos si el elegido falla
-- **Sin agregación automática**: No detecta necesidad de agregación temporal
-- **Sin comparación multi-dataset**: No puede combinar múltiples fuentes de datos
-
-## Extensibilidad
-
-### Agregar nuevo tipo de gráfica
-
-1. Actualizar tipo en `types.ts`:
-```typescript
-export type ChartType = 'line_chart' | 'bar_chart' | ... | 'NEW_TYPE';
-```
-
-2. Agregar generador en `tools.ts`:
-```typescript
-function generateNewTypeChartConfig(plan: VisualizationPlan, data: any[]): any {
-  // ... configuración de QuickChart
-  return { type: 'NEW_TYPE', data: {...}, options: {...} };
-}
-```
-
-3. Routing en `generateChartTool()`:
-```typescript
-else if (plan.chartType === 'NEW_TYPE') {
-  chartConfig = generateNewTypeChartConfig(plan, processedData);
-}
-```
-
-4. Actualizar prompt del planner en `planner.ts`:
-```typescript
-Available chart types: line_chart, bar_chart, ..., NEW_TYPE
-
-NEW_TYPE: Use when user asks for ...
-```
-
-### Cambiar provider de gráficas
-
-Reemplazar QuickChart por Plotly/D3/etc.:
-
-1. Instalar nueva dependencia: `npm install plotly.js`
-2. Crear nuevo generador en `tools.ts`:
-```typescript
-async function generateChartWithPlotly(plan, data, config) {
-  const Plotly = await import('plotly.js');
-  // ... generar HTML interactivo
-  return { htmlContent, isHTML: true };
-}
-```
-3. Actualizar `generateChartTool()` para usar el nuevo generador
-
-### Agregar herramienta de análisis
-
-1. Implementar en `tools.ts`:
-```typescript
-export async function newAnalysisTool(data: any[], params: any): Promise<any> {
-  // ... lógica de análisis
-  return result;
 }
 ```
 
 2. Opcional: Exponer como tool separado en MCP server si se necesita acceso directo
-
-## Casos de Uso
-
-### Visualización de datos IoT
-```javascript
-{
-  prompt: "Temperatura de los últimos 7 días",
-  data: sensorReadings.map(r => ({ time: r.timestamp, temp: r.temperature }))
-}
-// → Line chart temporal
-```
-
-### Análisis de distribución
-```javascript
-{
-  prompt: "Histograma de tiempos de respuesta",
-  data: requests.map(r => ({ responseTime: r.duration }))
-}
-// → Histogram con bins automáticos
-```
-
-### Comparación de categorías
-```javascript
-{
-  prompt: "Ventas por región en gráfica de barras",
-  data: [
-    { region: "Norte", sales: 45000 },
-    { region: "Sur", sales: 38000 },
-    { region: "Este", sales: 52000 }
-  ]
-}
-// → Bar chart
-```
-
-### Exportación para análisis
-```javascript
-{
-  prompt: "Exporta estos datos a CSV",
-  data: rawSensorData
-}
-// → Archivo CSV en output/
-```
-
-### Patrones complejos
-```javascript
-{
-  prompt: "Mapa de calor de actividad por hora y día",
-  data: userActivity.map(a => ({
-    day: a.dayOfWeek,
-    hour: a.hourOfDay,
-    count: a.activeUsers
-  }))
-}
-// → Heatmap 2D (HTML si es grande, QuickChart si es pequeño)
-```
-
-## Mejoras Futuras
-
-### Corto plazo
-- [ ] Cache de imágenes para evitar regeneración
-- [ ] Validación de esquema de datos con Zod
-- [ ] Retry logic para llamadas a QuickChart
-- [ ] Soporte para múltiples datasets en una misma gráfica
-- [ ] Temas de color personalizables
-
-### Medio plazo
-- [ ] Gráficas interactivas con Plotly.js
-- [ ] Exportación a PDF/Excel
-- [ ] Agregación temporal automática
-- [ ] Detección de outliers mejorada (IQR, DBSCAN)
-- [ ] Sugerencias de tipo de gráfica alternativas
-
-### Largo plazo
-- [ ] ML para predecir tipo de gráfica óptimo
-- [ ] Generación de dashboards multi-gráfica
-- [ ] Streaming de datos en tiempo real
-- [ ] Integración con BI tools (Tableau, Power BI)
-- [ ] A/B testing de visualizaciones
-
-## Troubleshooting
-
-### Error: "LLM provider not configured"
-**Causa:** Falta configurar `LLM_PROVIDER` en `.env`
-
-**Solución:**
-```bash
-echo "LLM_PROVIDER=copilot" >> .env
-# o
-echo "LLM_PROVIDER=openrouter" >> .env
-echo "OPENROUTER_API_KEY=sk-or-v1-..." >> .env
-```
-
-### Error: "QuickChart URL too long"
-**Causa:** Dataset muy grande genera URL >16KB
-
-**Solución:** El sampling automático debería evitarlo. Si persiste:
-1. Reducir manualmente el dataset antes de enviar
-2. O implementar generador alternativo (Plotly HTML)
-
-### Error: "Invalid JSON response from LLM"
-**Causa:** LLM retorna texto malformado
-
-**Solución:** El `safeJsonParse` debería manejarlo. Si persiste:
-1. Revisar logs del LLM provider
-2. Probar con modelo diferente (COPILOT_MODEL o OPENROUTER_MODEL)
-
-### Gráfica generada incorrecta
-**Causa:** LLM eligió tipo o campos incorrectos
-
-**Solución:**
-1. Ser más específico en el prompt: "gráfica de líneas" en lugar de "gráfica"
-2. Usar `suggestedType` parameter
-3. Revisar estructura de datos (campos consistentes)
-
-### No se genera archivo en output/
-**Causa:** Permisos de escritura o directorio no existe
-
-**Solución:**
-```bash
-mkdir -p output
-chmod 755 output
-```
-
-## Contribución
-
-Para contribuir al visualization agent:
-
-1. Fork del repositorio
-2. Crear rama feature: `git checkout -b feature/nueva-grafica`
-3. Hacer cambios y testear
-4. Commit: `git commit -m "feat: agregar soporte para violin plot"`
-5. Push: `git push origin feature/nueva-grafica`
-6. Crear Pull Request
-
-### Convenciones de código
-- TypeScript estricto (noImplicitAny, strictNullChecks)
-- Nombres descriptivos de variables
-- Logging con prefijo `[VIZ_AGENT][COMPONENTE]`
-- Tipos explícitos en interfaces públicas
-
----
-
-**Versión:** 2.0.0  
-**Última actualización:** 2024  
-**Autores:** OpenAgents Team

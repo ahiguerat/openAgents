@@ -35,6 +35,10 @@ const visualizationTool: Tool = {
         description: 'Optional: Suggest a chart type (line_chart, bar_chart, pie, scatter, table, area_chart, radar, histogram, heatmap)',
         enum: ['line_chart', 'bar_chart', 'pie', 'scatter', 'table', 'area_chart', 'radar', 'histogram', 'heatmap'],
       },
+      chartProvider: {
+        type: 'string',
+        description: 'Optional: Chart provider to use (quickchart, chartjs, plotly). Default: quickchart',
+      },
       outputDir: {
         type: 'string',
         description: 'Optional: Directory where to save the chart image (default: ./output)',
@@ -84,10 +88,11 @@ class VisualizationMCPServer {
       const startTime = Date.now();
       
       try {
-        const { prompt, data, suggestedType, outputDir } = request.params.arguments as {
+        const { prompt, data, suggestedType, chartProvider, outputDir } = request.params.arguments as {
           prompt: string;
           data: any[];
           suggestedType?: string;
+          chartProvider?: string;
           outputDir?: string;
         };
 
@@ -96,11 +101,15 @@ class VisualizationMCPServer {
         if (suggestedType) {
           console.error(`[VIZ_AGENT][MCP] Suggested type: ${suggestedType}`);
         }
+        if (chartProvider) {
+          console.error(`[VIZ_AGENT][MCP] Chart provider: ${chartProvider}`);
+        }
 
         const vizRequest: VisualizationRequest = {
           prompt,
           data,
           suggestedType,
+          chartProvider,
         };
 
         // Ejecutar el graph completo (planner -> generator -> saver)
